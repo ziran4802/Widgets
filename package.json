@@ -15,6 +15,7 @@
   ],
   "main": "src/main.js",
   "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
     "start": "electron . --manager",
     "manager": "electron . --manager",
     "smoke:manager": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/manager-smoke.ps1",
