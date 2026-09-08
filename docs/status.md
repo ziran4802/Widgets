@@ -18,7 +18,16 @@
 
 ### 本轮迁移自动化
 
-迁移基线已从已确认的 Widget 源快照复制到本仓库；`src/`、`test/`、`tools/` 和必要元数据未带入源 `.git`、`node_modules`、`dist` 或真实运行数据。依赖安装、Node 回归、smoke 和 portable 将在本轮执行后更新此节。
+迁移基线来自源快照 `77ddd230256686711d2a52ccb415ecb1ed9bc3c2`；`src/`、`test/`、`tools/` 和必要元数据未带入源 `.git`、`node_modules`、`dist` 或真实运行数据。目标仓库的独立安装、文档整理和脚本修正均已提交。
+
+- 工具链：Node.js `v24.15.0`、npm `11.12.1`、Electron `43.2.0`、koffi `2.14.1`。
+- `npm.cmd ci --registry=https://registry.npmjs.org/`：通过，安装 14 个包并报告 0 vulnerabilities；根 `postinstall` 自动补齐 Electron runtime。
+- `npm.cmd test`：95/95 通过。
+- `smoke:manager`、`smoke:manager-ui`、`smoke:single-instance`、`smoke:tray`、`smoke:note`、`smoke:codex-quota`、`smoke:renderer-recovery`、`smoke:autostart`、`smoke:performance`、`smoke:portable`：均通过。自启动 smoke 只验证 packaged `Widget.exe` 的静默启动，没有登记真实启动项。
+- 性能 smoke 本机基线：manager 335.4 MB、单组件 416.9 MB、双组件 489.3 MB、Renderer recovery 314.9 MB 峰值工作集；仅作当前机器观察值。
+- `npm.cmd run package:portable`：通过；`Widget.exe`、Electron 声明、项目 `LICENSE` 和 koffi `LICENSE.txt` 均在成品中。
+- M0 launcher 构建通过；带临时 profile、`--disable-gpu` 的 `--auto-attach` 探针退出码为 0。
+- `npm.cmd run smoke:desktop`：未通过，当前自动化会话报告 `WorkerW not found`；manager 能正常启动/退出，但无法在此会话完成真实 WorkerW 桌面层验证。
 
 ### 本轮人工验证
 
