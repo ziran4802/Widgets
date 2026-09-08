@@ -59,8 +59,11 @@ Copy-Item -LiteralPath $sourceRoot -Destination (Join-Path $appRoot 'src') -Recu
 Copy-Item -LiteralPath $packagePath -Destination (Join-Path $appRoot 'package.json') -Force
 Copy-Item -LiteralPath $projectLicensePath -Destination (Join-Path $appRoot 'LICENSE') -Force
 if (Test-Path -LiteralPath $koffiRoot) {
-  $koffiLicensePath = Join-Path $koffiRoot 'LICENSE'
-  if (-not (Test-Path -LiteralPath $koffiLicensePath)) { throw "koffi license notice is missing: $koffiLicensePath" }
+  $koffiLicensePath = @('LICENSE', 'LICENSE.txt') |
+    ForEach-Object { Join-Path $koffiRoot $_ } |
+    Where-Object { Test-Path -LiteralPath $_ } |
+    Select-Object -First 1
+  if ([string]::IsNullOrWhiteSpace([string]$koffiLicensePath)) { throw "koffi license notice is missing under $koffiRoot" }
   New-Item -ItemType Directory -Path (Join-Path $appRoot 'node_modules') -Force | Out-Null
   Copy-Item -LiteralPath $koffiRoot -Destination (Join-Path $appRoot 'node_modules\koffi') -Recurse -Force
 }

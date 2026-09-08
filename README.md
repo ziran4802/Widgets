@@ -99,4 +99,4 @@ docs/status.md             当前能力、证据与人工验证清单
 
 ## 许可证
 
-项目使用根目录 [`LICENSE`](LICENSE) 中的 MIT 许可证。portable 成品会保留项目许可证，并保留 Electron 与 koffi 自带的许可证/声明文件。
+项目使用根目录 [`LICENSE`](LICENSE) 中的 MIT 许可证。portable 成品会保留项目许可证，并保留 Electron 与 koffi 自带的许可证/声明文件（当前 koffi 包为 `LICENSE.txt`）。

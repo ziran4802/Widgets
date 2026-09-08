@@ -65,7 +65,7 @@ npm.cmd run smoke:portable
 
 smoke 脚本应使用临时配置、临时 Electron profile 和临时工作目录，并在结束时清理自己创建的范围。自动化自启动 smoke 只验证 `--autostart --silent-autostart` 行为，不注册真实当前用户启动项。
 
-portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生成的 `Widget.exe` 以及 `resources/app/LICENSE` 属于成品，不提交到 Git。Electron runtime 自带的 `LICENSE` / `LICENSES.chromium.html` 与 koffi 包内许可证保持独立，不以项目 MIT 文件覆盖它们。
+portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生成的 `Widget.exe` 以及 `resources/app/LICENSE` 属于成品，不提交到 Git。Electron runtime 自带的 `LICENSE` / `LICENSES.chromium.html` 与 koffi 包内的许可证（当前包为 `LICENSE.txt`）保持独立，不以项目 MIT 文件覆盖它们。
 
 ## 人工验证边界
 
