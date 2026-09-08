@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-labelledby="title desc">
+  <title id="title">Widget</title>
+  <desc id="desc">Four rounded blue squares arranged in a two by two grid</desc>
+  <rect x="2" y="2" width="12" height="12" rx="3" fill="#176bd8"/>
+  <rect x="18" y="2" width="12" height="12" rx="3" fill="#176bd8"/>
+  <rect x="2" y="18" width="12" height="12" rx="3" fill="#176bd8"/>
+  <rect x="18" y="18" width="12" height="12" rx="3" fill="#176bd8"/>
+</svg>

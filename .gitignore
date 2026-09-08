@@ -1,0 +1,7 @@
+node_modules/
+.m0-user-data/
+tools/m0-launcher/*.exe
+diagnostics/*.jsonl
+diagnostics/*.json
+dist/
+npm-debug.log*

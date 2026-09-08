@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget 管理器</title>
+  <link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brandline"><span class="app-mark" aria-hidden="true"><img src="widget-icon.svg" alt="" draggable="false"></span><span class="brand-name">Widget</span></div>
+      <div class="status-wrap"><span class="local-badge">本地运行</span><span id="status" class="badge" role="status">加载中</span><button id="refresh" class="quiet">刷新</button></div>
+    </header>
+    <div id="error" class="alert" role="alert" hidden></div>
+    <section class="workspace">
+      <aside class="sidebar" aria-label="管理器导航">
+        <div class="sidebar-title">管理</div>
+        <button class="nav-item active" data-view="components"><span class="nav-icon">▦</span><span>组件</span></button>
+        <button class="nav-item" data-view="appearance"><span class="nav-icon">◒</span><span>外观</span></button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>设置</span></button>
+        <div class="sidebar-spacer"></div>
+        <div class="sidebar-foot"><span class="foot-dot"></span><span>主屏 · 桌面组件</span></div>
+      </aside>
+      <section class="content">
+        <section id="page-components" class="page">
+          <header class="page-head">
+            <div><p class="eyebrow">MY COMPONENTS</p><h1>我的组件</h1><p class="subtitle">让常用信息，留在桌面上</p></div>
+            <div class="page-head-actions"><span id="revision" class="hint">revision —</span><button id="edit-layout" class="outline">⌘ 编辑布局</button></div>
+          </header>
+          <div class="divider"></div>
+          <section class="catalog-section">
+            <div class="section-head"><div><p class="eyebrow">CATALOG</p><h2>组件目录</h2></div><span class="hint">每种类型一个实例</span></div>
+            <div id="catalog" class="catalog-grid"></div>
+          </section>
+          <section class="instances-section">
+            <div class="section-head"><div><p class="eyebrow">ON DESKTOP</p><h2>已添加组件</h2></div><span id="instance-count" class="count-badge">0</span></div>
+            <div id="components" class="instance-list"></div>
+          </section>
+          <div class="info-banner"><span class="info-icon">i</span><span>进入编辑布局后，可拖动组件调整位置。取消布局不会影响已保存的便签文字。</span></div>
+        </section>
+        <section id="page-appearance" class="page" hidden>
+          <header class="page-head"><div><p class="eyebrow">APPEARANCE</p><h1>外观</h1><p class="subtitle">调整所有组件的默认显示风格</p></div></header>
+          <div class="divider"></div>
+          <section class="settings-card">
+            <div class="settings-copy"><h2>全局主题</h2><p>未单独覆盖主题的组件会跟随这里的设置。</p></div>
+            <label class="select-control"><span>主题</span><select id="global-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+          </section>
+          <section class="settings-card">
+            <div class="settings-copy"><h2>默认透明度</h2><p>影响未单独设置透明度的组件；单组件设置优先。</p></div>
+            <label class="range-control"><span id="global-opacity-label">92%</span><input id="global-opacity" type="range" min="0.4" max="1" step="0.01" value="0.92"></label>
+          </section>
+          <section class="settings-card compact-card"><div class="settings-copy"><h2>全局锁定</h2><p>锁定位置不会阻止便签正文编辑。</p></div><label class="switch"><input id="global-locked" type="checkbox"><span></span></label></section>
+        </section>
+        <section id="page-settings" class="page" hidden>
+          <header class="page-head"><div><p class="eyebrow">SETTINGS</p><h1>设置</h1><p class="subtitle">Widget 的运行与数据选项</p></div></header>
+          <div class="divider"></div>
+          <section class="settings-card autostart-card">
+            <div class="settings-copy"><h2>开机自启动</h2><p>登录当前 Windows 用户后静默恢复托盘和已保存的可见组件，不打开管理器。</p><p id="autostart-detail" class="settings-detail">正在读取 Windows 实际状态…</p></div>
+            <div class="autostart-actions">
+              <label class="switch"><input id="autostart-toggle" type="checkbox" disabled><span></span></label>
+              <span id="autostart-status" class="setting-value">读取中</span>
+              <button id="autostart-retry" class="quiet" type="button">重试</button>
+              <button id="autostart-repair" class="secondary" type="button" hidden>修复路径</button>
+              <button id="disable-autostart-exit" class="danger" type="button">关闭自启动并退出</button>
+            </div>
+          </section>
+          <section class="settings-card"><div class="settings-copy"><h2>数据目录</h2><p>配置保存在当前用户的 Electron 数据目录中。</p></div><span class="setting-value">本地配置</span></section>
+          <section class="settings-card"><div class="settings-copy"><h2>版本</h2><p>主屏桌面组件 · Windows 11 x64 · 本地单用户</p></div><span class="setting-value">0.1.0</span></section>
+        </section>
+        <section id="editor" class="panel editor" hidden>
+          <div class="section-head"><div><p class="eyebrow">EDIT SESSION</p><h2>编辑布局</h2></div><div class="editor-state"><span class="preview-badge">LIVE PREVIEW</span><span class="hint">完成才会保存，取消不写盘</span></div></div>
+          <div id="editor-content"></div>
+        </section>
+        <footer><span id="source">配置来源：—</span><span>Widget · 概念预览与真实数据</span></footer>
+      </section>
+    </section>
+  </main>
+  <script src="manager-renderer.js"></script>
+</body>
+</html>

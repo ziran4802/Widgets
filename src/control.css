@@ -1,0 +1,19 @@
+:root { color-scheme: light; font-family: "Segoe UI", system-ui, sans-serif; color: #172033; background: #eef2f8; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 680px; margin: 0 auto; padding: 24px; }
+header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+h1, h2, p { margin: 0; }
+h1 { font-size: 28px; letter-spacing: -0.02em; }
+h2 { font-size: 14px; margin-bottom: 12px; }
+.eyebrow { color: #4f6b9d; font-size: 11px; font-weight: 700; letter-spacing: .14em; margin-bottom: 6px; }
+.badge { border-radius: 999px; background: #dce8ff; color: #214f9a; padding: 6px 10px; font-size: 12px; }
+.panel { background: #fff; border: 1px solid #d6deec; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 8px 24px #22365c12; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+button { appearance: none; border: 1px solid #bdcbe4; border-radius: 9px; background: #f7f9fd; color: #18315f; padding: 10px 12px; cursor: pointer; font: inherit; text-align: left; }
+button:hover, button:focus-visible { border-color: #4777d4; outline: 3px solid #4777d433; }
+button.danger { color: #9a2e37; border-color: #edc8cc; }
+pre { min-height: 44px; margin: 0; padding: 10px; border-radius: 8px; background: #f5f7fb; color: #41516c; font: 12px/1.45 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note { color: #596984; font-size: 12px; line-height: 1.5; }
+@media (max-width: 600px) { main { padding: 16px; } .grid { grid-template-columns: 1fr; } }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget M0 Host Probe</title>
+  <link rel="stylesheet" href="control.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">WIDGET / M0</p><h1>桌面宿主探针</h1></div>
+      <span id="phase" class="badge">启动中</span>
+    </header>
+    <section class="panel">
+      <h2>操作</h2>
+      <div class="actions">
+        <button data-command="attach">附着 WorkerW</button>
+        <button data-command="observe">读回校验</button>
+        <button data-command="editing">编辑输入</button>
+        <button data-command="locked">锁定穿透</button>
+        <button data-command="geometry">写入几何</button>
+        <button data-command="sample-hit">采样命中</button>
+        <button data-command="restore">恢复窗口</button>
+        <button data-command="exit" class="danger">退出探针</button>
+      </div>
+    </section>
+    <section class="panel grid">
+      <div><h2>能力</h2><pre id="capability">—</pre></div>
+      <div><h2>最近结果</h2><pre id="last-result">—</pre></div>
+    </section>
+    <section class="panel">
+      <h2>当前状态</h2>
+      <pre id="state">等待窗口就绪…</pre>
+    </section>
+    <p class="note">本窗口是控制面板；右上角蓝色卡片是被测窗口。未附着或 native 依赖不可用时，结果只记录为 INCONCLUSIVE。</p>
+  </main>
+  <script src="control-renderer.js"></script>
+</body>
+</html>

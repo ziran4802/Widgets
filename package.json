@@ -1,0 +1,31 @@
+{
+  "name": "widget-m0-probe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Widget desktop host M0 probe",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron . --manager",
+    "manager": "electron . --manager",
+    "smoke:manager": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/manager-smoke.ps1",
+    "smoke:manager-ui": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/manager-ui-smoke.ps1",
+    "smoke:single-instance": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/single-instance-smoke.ps1",
+    "smoke:tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tray-smoke.ps1",
+    "smoke:note": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/note-smoke.ps1",
+    "smoke:codex-quota": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/codex-quota-smoke.ps1",
+    "smoke:desktop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/desktop-smoke.ps1",
+    "smoke:autostart": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/autostart-smoke.ps1",
+    "smoke:renderer-recovery": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/renderer-recovery-smoke.ps1",
+    "smoke:performance": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/performance-smoke.ps1",
+    "package:portable": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/portable-package.ps1",
+    "smoke:portable": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/portable-smoke.ps1",
+    "probe": "electron . --auto-attach",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "electron": "43.2.0"
+  },
+  "dependencies": {
+    "koffi": "2.14.1"
+  }
+}
