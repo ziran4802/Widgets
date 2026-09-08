@@ -1,7 +1,20 @@
 node_modules/
-.m0-user-data/
-tools/m0-launcher/*.exe
-diagnostics/*.jsonl
-diagnostics/*.json
 dist/
+diagnostics/
+.m0-user-data/
+
+# Local runtime/configuration data; keep source and test fixtures trackable.
+/widget-config.json
+/*.local.json
+/.env
+/.env.*
+!.env.example
+
+# Generated launchers and temporary runtime artifacts.
+tools/m0-launcher/*.exe
+*.log
+*.tmp
+/.tmp/
+
+# npm diagnostic output.
 npm-debug.log*

@@ -18,9 +18,10 @@ if (-not $outputPath.StartsWith($distRoot + [System.IO.Path]::DirectorySeparator
 
 $electronDist = Join-Path $projectRoot 'node_modules\electron\dist'
 $packagePath = Join-Path $projectRoot 'package.json'
+$projectLicensePath = Join-Path $projectRoot 'LICENSE'
 $sourceRoot = Join-Path $projectRoot 'src'
 $koffiRoot = Join-Path $projectRoot 'node_modules\koffi'
-foreach ($required in @($electronDist, $packagePath, $sourceRoot)) {
+foreach ($required in @($electronDist, $packagePath, $projectLicensePath, $sourceRoot)) {
   if (-not (Test-Path -LiteralPath $required)) { throw "Required packaging input is missing: $required" }
 }
 
@@ -30,6 +31,13 @@ Copy-Item -Path (Join-Path $electronDist '*') -Destination $outputPath -Recurse 
 
 $electronExe = Join-Path $outputPath 'electron.exe'
 if (-not (Test-Path -LiteralPath $electronExe)) { throw 'Electron runtime did not contain electron.exe' }
+$electronLicensePaths = @(
+  (Join-Path $outputPath 'LICENSE'),
+  (Join-Path $outputPath 'LICENSES.chromium.html')
+)
+foreach ($licensePath in $electronLicensePaths) {
+  if (-not (Test-Path -LiteralPath $licensePath)) { throw "Electron license notice is missing: $licensePath" }
+}
 Rename-Item -LiteralPath $electronExe -NewName 'Widget.exe'
 $widgetExe = Join-Path $outputPath 'Widget.exe'
 $iconScript = Join-Path $projectRoot 'tools\create-widget-icon.js'
@@ -49,7 +57,10 @@ $appRoot = Join-Path $outputPath 'resources\app'
 New-Item -ItemType Directory -Path $appRoot -Force | Out-Null
 Copy-Item -LiteralPath $sourceRoot -Destination (Join-Path $appRoot 'src') -Recurse -Force
 Copy-Item -LiteralPath $packagePath -Destination (Join-Path $appRoot 'package.json') -Force
+Copy-Item -LiteralPath $projectLicensePath -Destination (Join-Path $appRoot 'LICENSE') -Force
 if (Test-Path -LiteralPath $koffiRoot) {
+  $koffiLicensePath = Join-Path $koffiRoot 'LICENSE'
+  if (-not (Test-Path -LiteralPath $koffiLicensePath)) { throw "koffi license notice is missing: $koffiLicensePath" }
   New-Item -ItemType Directory -Path (Join-Path $appRoot 'node_modules') -Force | Out-Null
   Copy-Item -LiteralPath $koffiRoot -Destination (Join-Path $appRoot 'node_modules\koffi') -Recurse -Force
 }

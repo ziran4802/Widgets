@@ -2,7 +2,17 @@
   "name": "widget-m0-probe",
   "version": "0.1.0",
   "private": true,
-  "description": "Widget desktop host M0 probe",
+  "description": "Windows desktop widgets for personal vibe-coding experiments",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "main": "src/main.js",
   "scripts": {
     "start": "electron . --manager",
