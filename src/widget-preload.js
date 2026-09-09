@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('widget', Object.freeze({
   drag: (operation, pointerId) => ipcRenderer.invoke('widget:drag', operation, pointerId),
   refreshCodexQuota: () => ipcRenderer.invoke('widget:codex-quota-refresh'),
   saveNote: content => ipcRenderer.invoke('widget:note-save', content),
+  updateTodo: state => ipcRenderer.invoke('widget:todo-update', state),
   onFlushNote: callback => subscribe('widget:flush-note', callback),
   completeNoteFlush: (requestId, result) => ipcRenderer.send('widget:note-flush-complete', requestId, result)
 }));

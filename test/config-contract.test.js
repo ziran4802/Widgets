@@ -75,6 +75,7 @@ test('normalizes daily todo items and strips unsupported fields', () => {
   assert.deepEqual(normalized.config, { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '完成迁移', completed: true }] });
   assert.throws(() => normalizeComponent({ ...todo, config: { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '重复', completed: false }, { id: 'todo-1', title: '重复', completed: false }] } }), /unique/);
   assert.throws(() => normalizeComponent({ ...todo, config: { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '', completed: false }] } }), /non-empty/);
+  assert.throws(() => normalizeComponent({ ...todo, config: { dateKey: '2026-02-30', items: [] } }), /valid ISO local date/);
 });
 
 test('resets stale daily todo data only when the local day changes', () => {

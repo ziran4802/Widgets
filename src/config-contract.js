@@ -67,6 +67,13 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function isValidDateKey(value) {
+  if (!TODO_DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isFinite(date.getTime()) && localDateKey(date) === value;
+}
+
 function fail(path, message) {
   throw new TypeError(`${path}: ${message}`);
 }
@@ -123,7 +130,7 @@ function normalizeNoteConfig(value, path = 'config') {
 function normalizeTodoConfig(value, path = 'config') {
   if (!isPlainObject(value)) fail(path, 'must be an object');
   const dateKey = value.dateKey === undefined ? localDateKey() : value.dateKey;
-  if (typeof dateKey !== 'string' || !TODO_DATE_PATTERN.test(dateKey)) fail(`${path}.dateKey`, 'must be an ISO local date');
+  if (typeof dateKey !== 'string' || !isValidDateKey(dateKey)) fail(`${path}.dateKey`, 'must be a valid ISO local date');
   const items = value.items === undefined ? [] : value.items;
   if (!Array.isArray(items) || items.length > TODO_MAX_ITEMS) fail(`${path}.items`, `must contain at most ${TODO_MAX_ITEMS} items`);
   const seen = new Set();

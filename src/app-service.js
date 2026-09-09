@@ -36,7 +36,12 @@ class AppService {
         const saved = await this.store.save(config, this.now());
         config = saved.config;
       } catch (error) {
-        migrationError = publicError(error.code || 'CONFIG_WRITE_FAILED', '额度组件尺寸已在本次运行升级，但未能写回配置');
+        const message = quotaMigration.changed && todoMigration.changed
+          ? '组件配置已在本次运行升级，但未能写回配置'
+          : todoMigration.changed
+            ? '每日待办已切换到今天，但未能写回配置'
+            : '额度组件尺寸已在本次运行升级，但未能写回配置';
+        migrationError = publicError(error.code || 'CONFIG_WRITE_FAILED', message);
       }
     }
     this.catalog = new CatalogState(config, { now: this.now });

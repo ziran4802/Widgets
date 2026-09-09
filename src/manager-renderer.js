@@ -37,6 +37,7 @@ const COMPONENT_DETAILS = Object.freeze({
   'system-monitor': Object.freeze({ icon: 'CPU', description: '实时查看处理器、内存和指标状态' }),
   'clock-date': Object.freeze({ icon: '24h', description: '显示本地时间、日期和星期' }),
   note: Object.freeze({ icon: 'TXT', description: '一篇纯文本便签，自动保存内容' }),
+  'daily-todo': Object.freeze({ icon: 'TODO', description: '本地记录当天任务并追踪完成进度' }),
   'codex-quota': Object.freeze({ icon: 'CDX', description: '本地读取 Codex 五小时与周额度' })
 });
 
@@ -77,6 +78,18 @@ function catalogPreview(type) {
     const note = node('div', undefined, 'preview-note');
     note.append(node('strong', '便签'), node('span', '写下随手记录…'));
     preview.append(note);
+  } else if (type === 'daily-todo') {
+    const todo = node('div', undefined, 'preview-todo');
+    const head = node('div', undefined, 'preview-todo-head');
+    head.append(node('strong', '每日待办'), node('span', '3 / 5'));
+    const rows = node('div', undefined, 'preview-todo-rows');
+    for (const [label, checked] of [['整理今日任务', true], ['完成一个小目标', true], ['留出专注时间', false]]) {
+      const row = node('span', undefined, checked ? 'done' : '');
+      row.append(node('i', checked ? '✓' : '○'), node('em', label));
+      rows.append(row);
+    }
+    todo.append(head, rows);
+    preview.append(todo);
   } else if (type === 'codex-quota') {
     const quota = node('div', undefined, 'preview-codex-quota');
     const ring = node('span', undefined, 'preview-quota-ring');

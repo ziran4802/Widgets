@@ -303,6 +303,33 @@ test('coordinates a registered window with HostService when WorkerW mode is enab
   assert.equal(calls.some(call => call[0] === 'destroy'), true);
 });
 
+test('keeps the daily todo widget interactive while attached to WorkerW', async () => {
+  const calls = [];
+  const hostService = {
+    adapter: { registerWindow() {} },
+    async create(component) { calls.push(['create', component.instanceId]); return { phase: 'created' }; },
+    async attach(instanceId) { calls.push(['attach', instanceId]); return { phase: 'ready', instanceId, mode: 'locked' }; },
+    async setInputMode(instanceId, mode) { calls.push(['input', instanceId, mode]); return { phase: mode === 'editing' ? 'editing' : 'ready', instanceId, mode }; },
+    async setGeometry() { return { phase: 'ready' }; },
+    async destroy() { return { ok: true }; }
+  };
+  const created = [];
+  const service = new WidgetWindowService({
+    createWindow: options => { const window = new FakeWindow(options); created.push(window); return window; },
+    preloadPath: 'widget-preload.js',
+    pagePath: 'widget.html',
+    hostService
+  });
+  const todo = component({ instanceId: 'daily-todo-1', type: 'daily-todo', displayName: '每日待办' });
+  service.sync(snapshot([todo]));
+  await new Promise(resolve => setImmediate(resolve));
+  const window = created[0];
+  window.webContents.emit('did-finish-load');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls.at(-1), ['input', 'daily-todo-1', 'editing']);
+  assert.deepEqual(window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
+});
+
 test('moves a WorkerW widget from native mouse messages and captures the pointer', async () => {
   const calls = [];
   const hostService = {

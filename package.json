@@ -23,6 +23,7 @@
     "smoke:single-instance": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/single-instance-smoke.ps1",
     "smoke:tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tray-smoke.ps1",
     "smoke:note": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/note-smoke.ps1",
+    "smoke:todo": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/todo-smoke.ps1",
     "smoke:codex-quota": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/codex-quota-smoke.ps1",
     "smoke:desktop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/desktop-smoke.ps1",
     "smoke:autostart": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/autostart-smoke.ps1",

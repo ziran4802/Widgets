@@ -104,6 +104,14 @@ class WidgetWindowService {
     return { editing: record.editing, dragMode: record.hostMode === 'desktop' ? 'native-message' : 'electron-native' };
   }
 
+  isInteractive(record) {
+    return Boolean(record?.editing || record?.component?.type === 'daily-todo');
+  }
+
+  inputMode(record) {
+    return this.isInteractive(record) ? 'editing' : 'locked';
+  }
+
   createRecord(component) {
     const record = { component: clone(component), loaded: false, window: undefined, editing: false, moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
@@ -272,8 +280,9 @@ class WidgetWindowService {
           await new Promise(resolve => setTimeout(resolve, 400));
         }
         if (record.hostReady) {
-          await this.hostService.setInputMode(record.component.instanceId, record.editing ? 'editing' : 'locked');
-          this.setWindowMouseEvents(record, record.editing);
+          const interactive = this.isInteractive(record);
+          await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
+          this.setWindowMouseEvents(record, interactive);
           if (!this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
         } else if (this.isAlive(record.window) && typeof record.window.hide === 'function') {
           record.window.hide();
@@ -325,6 +334,7 @@ class WidgetWindowService {
     const record = this.windows.get(instanceId);
     if (!record) return false;
     record.component = resolveComponent(component, settings);
+    this.sendCurrent(record);
     return true;
   }
 
@@ -473,12 +483,12 @@ class WidgetWindowService {
           if (this.isAlive(record.window) && typeof record.window.hide === 'function') record.window.hide();
           return;
         }
-        const state = await this.hostService.setInputMode(instanceId, 'locked');
+        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         record.hostMode = record.hostReady ? 'desktop' : 'floating';
         this.notifyHostState(record, state);
-        this.setWindowMouseEvents(record, false);
+        this.setWindowMouseEvents(record, this.isInteractive(record));
         this.send(record, 'widget:edit-mode', this.editModePayload(record));
         if (record.hostReady && !this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
       }).catch(error => {
@@ -512,14 +522,15 @@ class WidgetWindowService {
     this.send(record, 'widget:edit-mode', this.editModePayload(record));
     if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
       this.queueHost(record, async () => {
-        const state = await this.hostService.setInputMode(instanceId, record.editing ? 'editing' : 'locked');
+        const interactive = this.isInteractive(record);
+        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);
         // Electron's mouse-ignore flag must be applied after the native
         // WS_EX_* transition, otherwise the two APIs can restore opposing
         // input styles on a reparented WorkerW child.
-        this.setWindowMouseEvents(record, record.editing);
+        this.setWindowMouseEvents(record, interactive);
       }).catch(() => {});
     }
     return true;

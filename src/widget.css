@@ -14,7 +14,7 @@ html, body, #root { width: 100%; height: 100%; }
 body { margin: 0; overflow: hidden; background: transparent; color: var(--text); }
 .widget { width: 100%; height: 100%; padding: 18px; border: 1px solid var(--line); border-radius: 18px; color: var(--text); background: linear-gradient(145deg, rgba(26, 54, 92, .96), var(--bg)); box-shadow: 0 14px 40px rgba(0, 0, 0, .22); -webkit-app-region: no-drag; user-select: none; }
 .widget.editing { outline: 2px solid rgba(114,178,255,.58); outline-offset: -3px; cursor: move; }
-.widget.editing:not(.note) { -webkit-app-region: drag; }
+.widget.editing:not(.note):not(.daily-todo) { -webkit-app-region: drag; }
 .widget.native-drag.editing, .widget.native-drag.editing * { -webkit-app-region: no-drag; }
 .widget.light { color-scheme: light; --bg: rgba(248, 251, 255, var(--widget-opacity)); --line: rgba(33, 60, 91, .16); --text: #12233a; --muted: #56708e; --accent: #176dce; color: var(--text); background: linear-gradient(145deg, #ffffff, var(--bg)); }
 .widget.system { color-scheme: dark; }
@@ -74,6 +74,36 @@ h1 { font-size: 20px; letter-spacing: -.03em; }
 .note-body { flex: 1; min-height: 72px; resize: none; overflow: auto; font-size: 14px; line-height: 1.55; }
 .note-retry { align-self: flex-start; padding: 5px 9px; border: 1px solid rgba(179, 62, 62, .4); border-radius: 7px; color: #963636; background: rgba(255,255,255,.25); font: inherit; font-size: 10px; cursor: pointer; }
 .note-retry:hover, .note-retry:focus-visible { background: rgba(255,255,255,.48); }
+.daily-todo { display: flex; flex-direction: column; gap: 13px; padding: 0; overflow: hidden; background: linear-gradient(145deg, rgba(26, 54, 92, .98), rgba(10, 23, 42, .96)); }
+.widget.light.daily-todo { background: linear-gradient(145deg, #ffffff, #eef5ff); }
+.todo-drag-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; padding: 8px 15px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.05); -webkit-app-region: no-drag; cursor: default; user-select: none; }
+.daily-todo.editing .todo-drag-strip { -webkit-app-region: drag; cursor: move; }
+.daily-todo.native-drag.editing .todo-drag-strip { -webkit-app-region: no-drag; }
+.todo-eyebrow { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
+.todo-drag-hint { color: var(--muted); font-size: 10px; }
+.todo-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 0 18px; }
+.todo-title { font-size: 24px; letter-spacing: -.05em; }
+.todo-date { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
+.todo-progress-copy { display: grid; justify-items: end; gap: 4px; color: var(--muted); font-size: 11px; }
+.todo-progress-copy strong { color: var(--accent); font-size: 21px; letter-spacing: -.05em; }
+.todo-progress { height: 7px; margin: 0 18px; overflow: hidden; border-radius: 999px; background: rgba(136, 164, 198, .2); }
+.todo-progress::before { display: block; width: var(--todo-progress); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #72b2ff, #8f68e8); content: ''; transition: width .2s ease; }
+.todo-list { display: grid; align-content: start; gap: 7px; min-height: 0; padding: 0 18px; overflow: auto; }
+.todo-item { display: flex; align-items: center; gap: 10px; min-height: 31px; padding: 5px 8px; border: 1px solid transparent; border-radius: 9px; color: var(--text); background: rgba(255,255,255,.045); cursor: pointer; -webkit-app-region: no-drag; user-select: none; }
+.todo-item:hover { border-color: var(--line); background: rgba(255,255,255,.08); }
+.todo-item input { width: 16px; height: 16px; margin: 0; accent-color: #72b2ff; cursor: pointer; }
+.todo-item-title { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.todo-item.completed .todo-item-title { color: var(--muted); text-decoration: line-through; }
+.todo-empty { margin: 6px 0; color: var(--muted); font-size: 12px; }
+.todo-add { display: flex; gap: 8px; padding: 0 18px; -webkit-app-region: no-drag; }
+.todo-add input { min-width: 0; flex: 1; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; outline: 0; color: var(--text); background: rgba(255,255,255,.06); font: inherit; font-size: 12px; user-select: text; }
+.todo-add input::placeholder { color: var(--muted); }
+.todo-add input:focus { border-color: var(--accent); }
+.todo-add-button { padding: 8px 11px; border: 1px solid rgba(114,178,255,.45); border-radius: 8px; color: var(--accent); background: rgba(114,178,255,.1); font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.todo-add-button:hover, .todo-add-button:focus-visible { background: rgba(114,178,255,.18); outline: none; }
+.todo-save-state { min-height: 14px; padding: 0 18px 13px; color: var(--muted); font-size: 10px; }
+.todo-save-state.saving { color: var(--accent); }
+.todo-save-state.failed { color: #f08b8b; }
 .codex-quota { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
 .quota-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .quota-title { font-size: 23px; }

@@ -8,6 +8,10 @@ let quotaTimer;
 let noteSaveTimer;
 let noteEditor;
 let noteSaveSequence = 0;
+let todoDateTimer;
+let todoSaveTail = Promise.resolve();
+let todoItemSequence = 0;
+let todoEditor;
 let dragMode = 'electron-native';
 let dragPointerId;
 let dragPendingUpdate;
@@ -35,6 +39,13 @@ function applyTheme(view) {
   if (editing) classes.push('editing');
   view.className = classes.join(' ');
   document.documentElement.style.setProperty('--widget-opacity', String(theme.opacity));
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear().toString().padStart(4, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function renderHeader(title, status = '实时') {
@@ -338,10 +349,121 @@ function renderNote(view) {
   view.append(strip, content);
 }
 
+function stopTodoDateTimer() {
+  if (todoDateTimer === undefined) return;
+  window.clearInterval(todoDateTimer);
+  todoDateTimer = undefined;
+}
+
+function todoDateLabel(date = new Date()) {
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  return `周${weekdays[date.getDay()]} · ${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function todoItemsForToday() {
+  const config = component?.config || {};
+  return config.dateKey === localDateKey() && Array.isArray(config.items) ? config.items : [];
+}
+
+function setTodoSaveState(state, message) {
+  if (!todoEditor) return;
+  todoEditor.status.textContent = message;
+  todoEditor.status.className = `todo-save-state ${state}`;
+}
+
+function localTodoState(items, dateKey = localDateKey()) {
+  component = {
+    ...component,
+    config: { dateKey, items: items.map(item => ({ ...item })) }
+  };
+}
+
+function saveTodoState(items) {
+  const payload = { dateKey: localDateKey(), items: items.map(item => ({ ...item })) };
+  const operation = todoSaveTail.then(async () => {
+    if (!component || component.type !== 'daily-todo' || typeof window.widget?.updateTodo !== 'function') return false;
+    setTodoSaveState('saving', '保存中…');
+    try {
+      const result = await window.widget.updateTodo(payload);
+      if (result?.ok !== true) throw new Error(result?.message || 'todo save failed');
+      setTodoSaveState('saved', '已保存');
+      return true;
+    } catch {
+      setTodoSaveState('failed', '保存失败');
+      return false;
+    }
+  });
+  todoSaveTail = operation.catch(() => false);
+  return operation;
+}
+
+function renderDailyTodo(view) {
+  stopTodoDateTimer();
+  view.classList.add('daily-todo');
+  const items = todoItemsForToday();
+  const completed = items.filter(item => item.completed).length;
+  const strip = node('div', undefined, 'todo-drag-strip');
+  strip.append(node('span', 'DAILY / TODO', 'todo-eyebrow'), node('span', '本地清单', 'todo-drag-hint'));
+  const header = node('header', undefined, 'todo-header');
+  const titleCopy = node('div');
+  titleCopy.append(node('h1', '每日待办', 'todo-title'), node('span', todoDateLabel(), 'todo-date'));
+  const progress = node('div', undefined, 'todo-progress-copy');
+  progress.append(node('span', '今日进度'), node('strong', `${completed} / ${items.length}`));
+  header.append(titleCopy, progress);
+  const progressBar = node('div', undefined, 'todo-progress');
+  progressBar.style.setProperty('--todo-progress', items.length === 0 ? '0%' : `${Math.round((completed / items.length) * 100)}%`);
+  const list = node('div', undefined, 'todo-list');
+  if (items.length === 0) list.append(node('p', '今天还没有待办，先添加一件小事吧。', 'todo-empty'));
+  for (const item of items) {
+    const row = node('label', undefined, `todo-item${item.completed ? ' completed' : ''}`);
+    const checkbox = node('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = item.completed;
+    checkbox.setAttribute('aria-label', `完成：${item.title}`);
+    checkbox.addEventListener('change', () => {
+      const next = todoItemsForToday().map(candidate => candidate.id === item.id ? { ...candidate, completed: checkbox.checked } : candidate);
+      localTodoState(next);
+      render();
+      void saveTodoState(next);
+    });
+    row.append(checkbox, node('span', item.title, 'todo-item-title'));
+    list.append(row);
+  }
+  const add = node('form', undefined, 'todo-add');
+  const input = node('input');
+  input.type = 'text';
+  input.maxLength = 160;
+  input.placeholder = '添加任务…';
+  input.setAttribute('aria-label', '添加待办任务');
+  const addButton = node('button', '添加任务', 'todo-add-button');
+  addButton.type = 'submit';
+  add.addEventListener('submit', event => {
+    event.preventDefault();
+    const title = input.value.trim();
+    if (!title || todoItemsForToday().length >= 64) return;
+    const next = [...todoItemsForToday(), { id: `todo-${Date.now()}-${++todoItemSequence}`, title, completed: false }];
+    input.value = '';
+    localTodoState(next);
+    render();
+    void saveTodoState(next);
+  });
+  add.append(input, addButton);
+  const status = node('span', '已保存', 'todo-save-state saved');
+  todoEditor = { view, input, status };
+  view.append(strip, header, progressBar, list, add, status);
+  todoDateTimer = window.setInterval(() => {
+    if (component?.type !== 'daily-todo' || component.config?.dateKey === localDateKey()) return;
+    localTodoState([]);
+    render();
+    void saveTodoState([]);
+  }, 60000);
+}
+
 function isDragSurface(target) {
   if (!editing || dragMode !== 'native-message') return false;
-  if (component?.type !== 'note') return true;
-  return Boolean(target?.closest?.('.note-drag-strip'));
+  if (component?.type === 'note') return Boolean(target?.closest?.('.note-drag-strip'));
+  if (component?.type === 'daily-todo') return Boolean(target?.closest?.('.todo-drag-strip'));
+  return true;
 }
 
 function drainDragQueue() {
@@ -396,16 +518,19 @@ function render() {
   if (!component) {
     stopClockTimer();
     stopQuotaTimer();
+    stopTodoDateTimer();
     return;
   }
   if (component.type !== 'clock-date') stopClockTimer();
   if (component.type !== 'codex-quota') stopQuotaTimer();
+  if (component.type !== 'daily-todo') stopTodoDateTimer();
   root.replaceChildren();
   const view = node('section', undefined, 'widget');
   applyTheme(view);
   if (component.type === 'system-monitor') renderSystemMonitor(view);
   else if (component.type === 'clock-date') renderClock(view);
   else if (component.type === 'note') renderNote(view);
+  else if (component.type === 'daily-todo') renderDailyTodo(view);
   else if (component.type === 'codex-quota') renderCodexQuota(view);
   else view.append(node('p', '组件类型暂不支持', 'fallback'));
   installNativeDragSurface(view);
@@ -430,4 +555,4 @@ window.widget.onFlushNote(async ({ requestId } = {}) => {
   const ok = await saveNoteNow();
   window.widget.completeNoteFlush(requestId, { ok, errorCode: ok ? undefined : 'NOTE_SAVE_FAILED' });
 });
-window.addEventListener('beforeunload', () => { stopClockTimer(); stopQuotaTimer(); clearNoteSaveTimer(); });
+window.addEventListener('beforeunload', () => { stopClockTimer(); stopQuotaTimer(); stopTodoDateTimer(); clearNoteSaveTimer(); });

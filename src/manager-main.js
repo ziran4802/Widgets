@@ -236,6 +236,10 @@ function noteSaveFailure(code = 'NOTE_SAVE_FAILED') {
   return { schemaVersion: 1, ok: false, errorCode: code, message: '便签保存失败，请重试' };
 }
 
+function todoSaveFailure(code = 'TODO_SAVE_FAILED') {
+  return { schemaVersion: 1, ok: false, errorCode: code, message: '待办保存失败，请重试' };
+}
+
 async function saveNoteFromWidget(event, payload) {
   if (quitting) return noteSaveFailure('APP_EXITING');
   const record = widgetWindows?.findRecordBySender(event.sender);
@@ -257,6 +261,27 @@ async function saveNoteFromWidget(event, payload) {
     });
   } catch {
     return noteSaveFailure('APP_EXITING');
+  }
+}
+
+async function saveTodoFromWidget(event, payload) {
+  if (quitting) return todoSaveFailure('APP_EXITING');
+  if (event?.senderFrame !== event?.sender?.mainFrame) return todoSaveFailure('UNAUTHORIZED_SENDER');
+  const record = widgetWindows?.findRecordBySender(event.sender);
+  if (!record || record.component.type !== 'daily-todo') return todoSaveFailure('UNAUTHORIZED_SENDER');
+  try {
+    return await operationQueue.enqueue(async () => {
+      try {
+        const component = await service.updateTodoItems(record.component.instanceId, payload);
+        widgetWindows.updateComponentRecord(record.component.instanceId, component, service.snapshot().catalog.settings);
+        if (process.env.WIDGET_M1_TEST_TODO_MS) report('todo-save-test', { result: 'SAVED', instanceId: record.component.instanceId });
+        return { schemaVersion: 1, ok: true, component };
+      } catch {
+        return todoSaveFailure();
+      }
+    });
+  } catch {
+    return todoSaveFailure('APP_EXITING');
   }
 }
 
@@ -344,6 +369,25 @@ function scheduleNoteSmokeTest() {
   }, delayMs);
 }
 
+function scheduleTodoSmokeTest() {
+  const delayMs = Number(process.env.WIDGET_M1_TEST_TODO_MS || 0);
+  if (!Number.isFinite(delayMs) || delayMs <= 0) return;
+  const expectedTitle = process.env.WIDGET_M1_TEST_TODO_TITLE || 'smoke todo';
+  setTimeout(() => {
+    if (quitting) return;
+    const record = [...(widgetWindows?.windows?.values() || [])].find(candidate => candidate.component.type === 'daily-todo');
+    if (!record || !record.window?.webContents?.executeJavaScript) {
+      report('todo-edit-test', { result: 'FAIL', reason: 'daily todo test target unavailable' });
+      return;
+    }
+    const title = JSON.stringify(expectedTitle);
+    const script = `(() => { const input = document.querySelector('.todo-add input'); const button = document.querySelector('.todo-add-button'); if (!input || !button) return false; input.value = ${title}; button.click(); const checkbox = document.querySelector('.todo-item input:not(:checked)'); if (!checkbox) return false; checkbox.click(); return true; })()`;
+    record.window.webContents.executeJavaScript(script).then(ok => {
+      report('todo-edit-test', { result: ok ? 'TRIGGERED' : 'FAIL' });
+    }).catch(error => report('todo-edit-test', { result: 'FAIL', reason: sanitizeReason(error.message) }));
+  }, delayMs);
+}
+
 function scheduleManagerUiSmokeTest() {
   const delayMs = Number(process.env.WIDGET_M1_TEST_MANAGER_UI_MS || 0);
   if (!Number.isFinite(delayMs) || delayMs <= 0) return;
@@ -367,7 +411,7 @@ function scheduleManagerUiSmokeTest() {
       const componentsVisible = document.querySelector('#page-components')?.hidden === false;
       const theme = document.querySelector('#global-theme');
       if (theme) { theme.value = 'light'; theme.dispatchEvent(new Event('change', { bubbles: true })); }
-      return { ok: present && cards === 4 && instances === 4 && switchAligned && appearanceVisible && settingsVisible && componentsVisible && theme?.value === 'light' };
+      return { ok: present && cards === 5 && instances === 5 && switchAligned && appearanceVisible && settingsVisible && componentsVisible && theme?.value === 'light' };
     })()`;
     managerWindow.webContents.executeJavaScript(script).then(result => {
       report('manager-ui-test', { result: result?.ok ? 'PASS' : 'FAIL' });
@@ -532,6 +576,7 @@ async function start() {
     });
   });
   ipcMain.handle('widget:note-save', (event, payload) => saveNoteFromWidget(event, payload));
+  ipcMain.handle('widget:todo-update', (event, payload) => saveTodoFromWidget(event, payload));
   ipcMain.handle('widget:drag', (event, operation, pointerId) => dragFromWidget(event, operation, pointerId));
   ipcMain.handle('widget:codex-quota-refresh', (event) => refreshCodexQuotaFromWidget(event));
   ipcMain.handle('manager:autostart', async (event, action) => {
@@ -563,6 +608,7 @@ async function start() {
   codexQuota.start();
   scheduleRendererRecoveryTest();
   scheduleNoteSmokeTest();
+  scheduleTodoSmokeTest();
   scheduleManagerUiSmokeTest();
   scheduleCodexQuotaSmokeTest();
   scheduleDesktopHostSmokeTest();

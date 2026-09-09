@@ -71,6 +71,15 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: -.02em; }
 .preview-clock small { color: #6e86a1; font-size: 9px; }
 .preview-note { width: 66%; min-height: 74px; padding: 10px; border: 1px solid #e3cd75; border-radius: 7px; background: #fff4b8; color: #6c5d2c; font-size: 10px; }
 .preview-note strong { display: block; margin-bottom: 8px; font-size: 12px; }
+.preview-todo { width: 88%; padding: 10px; border: 1px solid #b8cbea; border-radius: 8px; background: #f7faff; color: #183455; font-size: 9px; }
+.preview-todo-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.preview-todo-head strong { font-size: 12px; }
+.preview-todo-head span { color: #176dce; font-weight: 700; }
+.preview-todo-rows { display: grid; gap: 5px; }
+.preview-todo-rows span { display: flex; align-items: center; gap: 5px; color: #6e86a1; }
+.preview-todo-rows i { display: grid; width: 13px; height: 13px; place-items: center; border: 1px solid #9db7d9; border-radius: 4px; color: #176dce; font-size: 9px; font-style: normal; }
+.preview-todo-rows em { overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.preview-todo-rows .done em { color: #5c7798; text-decoration: line-through; }
 .preview-monitor { display: flex; align-items: center; gap: 6px; }
 .preview-codex-quota { display: flex; align-items: center; gap: 13px; width: 88%; padding: 9px; border: 1px solid #c7dcf5; border-radius: 8px; background: #fff; color: #19385d; }
 .preview-quota-ring { position: relative; display: grid; width: 46px; height: 46px; place-items: center; border-radius: 50%; background: conic-gradient(#176dce 68%, #dce8f6 0); }
