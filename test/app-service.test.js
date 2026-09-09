@@ -135,6 +135,25 @@ test('autosaves note content and restores it after restart', async () => {
   assert.deepEqual(restored.catalog.components[0].bounds, { x: 320, y: 16, width: 300, height: 260, unit: 'dip' });
 });
 
+test('autosaves daily todo items and resets them after the local day changes', async () => {
+  const { store, service } = serviceWithTempStore();
+  const today = new Date('2026-09-09T10:00:00');
+  const todayService = new AppService({ store, now: () => today });
+  await todayService.start();
+  const todo = await todayService.addComponent('daily-todo');
+  await todayService.updateTodoItems(todo.instanceId, {
+    dateKey: '2026-09-09',
+    items: [{ id: 'todo-1', title: '验证保存', completed: false }]
+  });
+  const restored = new AppService({ store, now: () => new Date('2026-09-09T18:00:00') });
+  const sameDay = await restored.start();
+  assert.deepEqual(sameDay.catalog.components[0].config.items, [{ id: 'todo-1', title: '验证保存', completed: false }]);
+  const nextDay = new AppService({ store, now: () => new Date('2026-09-10T08:00:00') });
+  const reset = await nextDay.start();
+  assert.deepEqual(reset.catalog.components[0].config, { dateKey: '2026-09-10', items: [] });
+  assert.deepEqual((await store.load()).config.components[0].config, { dateKey: '2026-09-10', items: [] });
+});
+
 test('persists global appearance settings and restores them after restart', async () => {
   const { store, service } = serviceWithTempStore();
   await service.start();

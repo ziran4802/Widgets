@@ -1,5 +1,5 @@
 const { CatalogState, CatalogStateError } = require('./catalog-state');
-const { migrateLegacyCodexQuotaBounds } = require('./config-contract');
+const { migrateDailyTodo, migrateLegacyCodexQuotaBounds } = require('./config-contract');
 
 class AppServiceError extends Error {
   constructor(code, message, cause) {
@@ -27,10 +27,11 @@ class AppService {
   async start() {
     if (this.catalog) return this.snapshot();
     const loaded = await this.store.load();
-    const migration = migrateLegacyCodexQuotaBounds(loaded.config);
-    let config = migration.config;
+    const quotaMigration = migrateLegacyCodexQuotaBounds(loaded.config);
+    const todoMigration = migrateDailyTodo(quotaMigration.config, this.now());
+    let config = todoMigration.config;
     let migrationError;
-    if (migration.changed && loaded.source === 'primary') {
+    if ((quotaMigration.changed || todoMigration.changed) && loaded.source === 'primary') {
       try {
         const saved = await this.store.save(config, this.now());
         config = saved.config;
@@ -38,7 +39,7 @@ class AppService {
         migrationError = publicError(error.code || 'CONFIG_WRITE_FAILED', '额度组件尺寸已在本次运行升级，但未能写回配置');
       }
     }
-    this.catalog = new CatalogState(config);
+    this.catalog = new CatalogState(config, { now: this.now });
     this.configSource = loaded.source;
     if (migrationError) {
       this.phase = 'degraded';
@@ -116,6 +117,14 @@ class AppService {
     this.ensureStarted();
     const candidate = this.catalog.cloneForTransaction();
     const component = candidate.setNoteContent(instanceId, content);
+    await this.saveCandidate(candidate);
+    return component;
+  }
+
+  async updateTodoItems(instanceId, state) {
+    this.ensureStarted();
+    const candidate = this.catalog.cloneForTransaction();
+    const component = candidate.setTodoItems(instanceId, state);
     await this.saveCandidate(candidate);
     return component;
   }

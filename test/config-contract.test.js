@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createDefaultConfig, createDefaultComponent, migrateLegacyCodexQuotaBounds, normalizeConfig, normalizeComponent } = require('../src/config-contract');
+const { createDefaultConfig, createDefaultComponent, createDefaultTodoConfig, migrateDailyTodo, migrateLegacyCodexQuotaBounds, normalizeConfig, normalizeComponent } = require('../src/config-contract');
 
 test('creates an empty versioned config and default component', () => {
   const now = new Date('2026-09-06T00:00:00.000Z');
@@ -60,4 +60,28 @@ test('normalizes a note as bounded plain text with explicit visual options', () 
   assert.deepEqual(normalized.config, { title: '今天', text: '只保存纯文本', size: 'large', background: 'blue' });
   assert.equal(normalizeComponent({ ...note, config: { ...note.config, text: '<script>alert(1)</script>' } }).config.text, '<script>alert(1)</script>');
   assert.throws(() => normalizeComponent({ ...note, config: { ...note.config, size: 'huge' } }), /size/);
+});
+
+test('normalizes daily todo items and strips unsupported fields', () => {
+  const todo = createDefaultComponent('daily-todo', 'daily-todo-1');
+  assert.deepEqual(todo.config, createDefaultTodoConfig());
+  const normalized = normalizeComponent({
+    ...todo,
+    config: {
+      dateKey: '2026-09-09',
+      items: [{ id: 'todo-1', title: '完成迁移', completed: true, ignored: 'drop me' }]
+    }
+  });
+  assert.deepEqual(normalized.config, { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '完成迁移', completed: true }] });
+  assert.throws(() => normalizeComponent({ ...todo, config: { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '重复', completed: false }, { id: 'todo-1', title: '重复', completed: false }] } }), /unique/);
+  assert.throws(() => normalizeComponent({ ...todo, config: { dateKey: '2026-09-09', items: [{ id: 'todo-1', title: '', completed: false }] } }), /non-empty/);
+});
+
+test('resets stale daily todo data only when the local day changes', () => {
+  const todo = createDefaultComponent('daily-todo', 'daily-todo-1');
+  const config = { ...createDefaultConfig(), components: [{ ...todo, config: { dateKey: '2026-09-08', items: [{ id: 'todo-1', title: '昨天', completed: false }] } }] };
+  const migrated = migrateDailyTodo(config, new Date('2026-09-09T01:00:00'));
+  assert.equal(migrated.changed, true);
+  assert.deepEqual(migrated.config.components[0].config, { dateKey: '2026-09-09', items: [] });
+  assert.equal(migrateDailyTodo(migrated.config, new Date('2026-09-09T18:00:00')).changed, false);
 });

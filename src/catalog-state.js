@@ -5,6 +5,7 @@ const {
   normalizeComponent,
   normalizeBounds,
   normalizeNoteConfig,
+  normalizeTodoConfig,
   normalizeSettings,
   normalizeConfig,
   clone
@@ -14,6 +15,7 @@ const CATALOG_DEFINITIONS = Object.freeze([
   Object.freeze({ type: 'system-monitor', displayName: '系统监测' }),
   Object.freeze({ type: 'clock-date', displayName: '时钟 / 日期' }),
   Object.freeze({ type: 'note', displayName: '便签' }),
+  Object.freeze({ type: 'daily-todo', displayName: '每日待办' }),
   Object.freeze({ type: 'codex-quota', displayName: 'Codex 额度' })
 ]);
 
@@ -30,8 +32,10 @@ function findComponent(config, instanceId) {
 }
 
 class CatalogState {
-  constructor(config = createDefaultConfig()) {
+  constructor(config = createDefaultConfig(), { now = () => new Date() } = {}) {
     this.config = normalizeConfig(config);
+    if (typeof now !== 'function') throw new TypeError('now must be a function');
+    this.now = now;
     this.revision = 0;
     this.activeEdit = null;
     this.nextIds = Object.fromEntries(COMPONENT_TYPES.map(type => [type, this.initialNextId(type)]));
@@ -53,7 +57,7 @@ class CatalogState {
   }
 
   cloneForTransaction() {
-    const copy = new CatalogState(this.config);
+    const copy = new CatalogState(this.config, { now: this.now });
     copy.revision = this.revision;
     copy.activeEdit = this.activeEdit ? clone(this.activeEdit) : null;
     copy.nextIds = { ...this.nextIds };
@@ -158,6 +162,27 @@ class CatalogState {
       this.activeEdit = {
         ...this.activeEdit,
         workingCopy: normalizeComponent({ ...this.activeEdit.workingCopy, config: { ...this.activeEdit.workingCopy.config, title: nextConfig.title, text: nextConfig.text } })
+      };
+    }
+    return clone(nextComponent);
+  }
+
+  setTodoItems(instanceId, state) {
+    if (!state || typeof state !== 'object' || Array.isArray(state)) throw new CatalogStateError('INVALID_VALUE', 'todo state must be an object');
+    const component = findComponent(this.config, instanceId);
+    if (!component) throw new CatalogStateError('COMPONENT_NOT_FOUND', 'component instance does not exist');
+    if (component.type !== 'daily-todo') throw new CatalogStateError('INVALID_COMPONENT_TYPE', 'only daily todo components have editable items');
+    const nextConfig = normalizeTodoConfig({
+      ...component.config,
+      dateKey: state.dateKey === undefined ? component.config.dateKey : state.dateKey,
+      items: state.items === undefined ? component.config.items : state.items
+    }, 'daily-todo.config');
+    const nextComponent = normalizeComponent({ ...component, config: nextConfig });
+    this.commit({ ...this.config, components: this.config.components.map(item => item.instanceId === instanceId ? nextComponent : item) });
+    if (this.activeEdit?.instanceId === instanceId) {
+      this.activeEdit = {
+        ...this.activeEdit,
+        workingCopy: normalizeComponent({ ...this.activeEdit.workingCopy, config: nextConfig })
       };
     }
     return clone(nextComponent);

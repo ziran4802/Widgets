@@ -101,6 +101,22 @@ test('note layout updates do not overwrite content saved during the same edit se
   assert.deepEqual(completed.components[0].config, { title: '实时标题', text: '实时正文', size: 'large', background: 'blue' });
 });
 
+test('persists daily todo items independently and keeps them when layout editing is cancelled', () => {
+  const catalog = new CatalogState(undefined, { now: () => new Date('2026-09-09T10:00:00') });
+  const todo = catalog.addComponent('daily-todo');
+  catalog.beginEdit(todo.instanceId, 'session-todo-1');
+  catalog.updateEdit('session-todo-1', { bounds: { x: 220, y: 240, width: 420, height: 360, unit: 'dip' } });
+  const saved = catalog.setTodoItems(todo.instanceId, {
+    dateKey: '2026-09-09',
+    items: [{ id: 'todo-1', title: '完成迁移', completed: true }]
+  });
+  assert.deepEqual(saved.config.items, [{ id: 'todo-1', title: '完成迁移', completed: true }]);
+  catalog.cancelEdit('session-todo-1');
+  const restored = catalog.getSnapshot().components[0];
+  assert.deepEqual(restored.config.items, [{ id: 'todo-1', title: '完成迁移', completed: true }]);
+  assert.deepEqual(restored.bounds, { x: 16, y: 336, width: 360, height: 420, unit: 'dip' });
+});
+
 test('persists global appearance settings without changing component overrides', () => {
   const catalog = new CatalogState();
   const clock = catalog.addComponent('clock-date');

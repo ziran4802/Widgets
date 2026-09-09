@@ -3,10 +3,13 @@ const LAYOUT_VERSION = 1;
 const MAX_COMPONENTS = 32;
 const MAX_PRIVATE_CONFIG_BYTES = 16 * 1024;
 const DEFAULT_GLOBAL_OPACITY = 0.92;
-const COMPONENT_TYPES = Object.freeze(['system-monitor', 'clock-date', 'note', 'codex-quota']);
+const COMPONENT_TYPES = Object.freeze(['system-monitor', 'clock-date', 'note', 'daily-todo', 'codex-quota']);
 const THEMES = Object.freeze(['system', 'light', 'dark']);
 const NOTE_SIZES = Object.freeze(['compact', 'standard', 'large']);
 const NOTE_BACKGROUNDS = Object.freeze(['yellow', 'blue', 'green', 'pink']);
+const TODO_MAX_ITEMS = 64;
+const TODO_MAX_TITLE_LENGTH = 160;
+const TODO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const COMPONENT_DEFINITIONS = Object.freeze({
   'system-monitor': Object.freeze({
@@ -23,6 +26,11 @@ const COMPONENT_DEFINITIONS = Object.freeze({
     displayName: '便签',
     bounds: Object.freeze({ x: 320, y: 16, width: 300, height: 260, unit: 'dip' }),
     config: Object.freeze({ title: '', text: '', size: 'standard', background: 'yellow' })
+  }),
+  'daily-todo': Object.freeze({
+    displayName: '每日待办',
+    bounds: Object.freeze({ x: 16, y: 336, width: 360, height: 420, unit: 'dip' }),
+    config: Object.freeze({ items: [] })
   }),
   'codex-quota': Object.freeze({
     displayName: 'Codex 额度',
@@ -49,6 +57,14 @@ function integer(value) {
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function localDateKey(date = new Date()) {
+  if (!(date instanceof Date) || !Number.isFinite(date.getTime())) fail('date', 'must be a valid date');
+  const year = date.getFullYear().toString().padStart(4, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function fail(path, message) {
@@ -104,6 +120,28 @@ function normalizeNoteConfig(value, path = 'config') {
   return { title, text, size, background };
 }
 
+function normalizeTodoConfig(value, path = 'config') {
+  if (!isPlainObject(value)) fail(path, 'must be an object');
+  const dateKey = value.dateKey === undefined ? localDateKey() : value.dateKey;
+  if (typeof dateKey !== 'string' || !TODO_DATE_PATTERN.test(dateKey)) fail(`${path}.dateKey`, 'must be an ISO local date');
+  const items = value.items === undefined ? [] : value.items;
+  if (!Array.isArray(items) || items.length > TODO_MAX_ITEMS) fail(`${path}.items`, `must contain at most ${TODO_MAX_ITEMS} items`);
+  const seen = new Set();
+  const normalizedItems = items.map((item, index) => {
+    if (!isPlainObject(item)) fail(`${path}.items[${index}]`, 'must be an object');
+    const id = item.id;
+    const title = item.title;
+    const completed = item.completed;
+    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,95}$/.test(id)) fail(`${path}.items[${index}].id`, 'must be a stable identifier');
+    if (seen.has(id)) fail(`${path}.items[${index}].id`, 'must be unique');
+    seen.add(id);
+    if (typeof title !== 'string' || title.trim().length === 0 || title.length > TODO_MAX_TITLE_LENGTH) fail(`${path}.items[${index}].title`, `must be non-empty text of at most ${TODO_MAX_TITLE_LENGTH} characters`);
+    if (typeof completed !== 'boolean') fail(`${path}.items[${index}].completed`, 'must be boolean');
+    return { id, title, completed };
+  });
+  return { dateKey, items: normalizedItems };
+}
+
 function normalizeSettings(value, path = 'settings') {
   if (!isPlainObject(value)) fail(path, 'must be an object');
   const opacity = value.opacity === undefined ? DEFAULT_GLOBAL_OPACITY : value.opacity;
@@ -125,7 +163,11 @@ function normalizeComponent(value, path = 'component') {
   const bounds = normalizeBounds(value.bounds, `${path}.bounds`);
   const theme = normalizeTheme(value.theme, `${path}.theme`);
   checkPrivateValue(value.config, `${path}.config`);
-  const componentConfig = value.type === 'note' ? normalizeNoteConfig(value.config, `${path}.config`) : clone(value.config);
+  const componentConfig = value.type === 'note'
+    ? normalizeNoteConfig(value.config, `${path}.config`)
+    : value.type === 'daily-todo'
+      ? normalizeTodoConfig(value.config, `${path}.config`)
+      : clone(value.config);
   const configBytes = Buffer.byteLength(JSON.stringify(componentConfig), 'utf8');
   if (configBytes > MAX_PRIVATE_CONFIG_BYTES) fail(`${path}.config`, 'private configuration is too large');
   return {
@@ -190,8 +232,25 @@ function createDefaultComponent(type, instanceId) {
     displayId: null,
     bounds: definition.bounds,
     theme: { name: 'system', opacity: 0.92 },
-    config: definition.config
+    config: type === 'daily-todo' ? createDefaultTodoConfig() : definition.config
   });
+}
+
+function createDefaultTodoConfig(now = new Date()) {
+  return { dateKey: localDateKey(now), items: [] };
+}
+
+function migrateDailyTodo(config, now = new Date()) {
+  if (!isPlainObject(config) || !Array.isArray(config.components)) return { config, changed: false };
+  const dateKey = localDateKey(now);
+  let changed = false;
+  const next = clone(config);
+  next.components = next.components.map(component => {
+    if (component.type !== 'daily-todo' || component.config.dateKey === dateKey) return component;
+    changed = true;
+    return { ...component, config: { dateKey, items: [] } };
+  });
+  return { config: changed ? next : config, changed };
 }
 
 function migrateLegacyCodexQuotaBounds(config) {
@@ -223,14 +282,20 @@ module.exports = {
   DEFAULT_GLOBAL_OPACITY,
   NOTE_SIZES,
   NOTE_BACKGROUNDS,
+  TODO_MAX_ITEMS,
+  TODO_MAX_TITLE_LENGTH,
+  localDateKey,
   normalizeBounds,
   normalizeComponent,
   normalizeConfig,
   validateConfig: normalizeConfig,
   createDefaultConfig,
   createDefaultComponent,
+  createDefaultTodoConfig,
+  migrateDailyTodo,
   migrateLegacyCodexQuotaBounds,
   normalizeNoteConfig,
+  normalizeTodoConfig,
   normalizeSettings,
   clone
 };
