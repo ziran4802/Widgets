@@ -23,7 +23,7 @@
 
 - 工具链：Node.js `v24.15.0`、npm `11.12.1`、Electron `43.2.0`、koffi `2.14.1`。
 - `npm.cmd ci --registry=https://registry.npmjs.org/`：通过，安装 14 个包并报告 0 vulnerabilities；根 `postinstall` 自动补齐 Electron runtime。
-- 迁移完成时的 Node 基线为 95/95；加入每日待办后的 `npm.cmd test`：99/99 通过。
+- 迁移完成时的 Node 基线为 95/95；加入每日待办后的 `npm.cmd test`：100/100 通过。
 - `smoke:manager`、`smoke:manager-ui`、`smoke:single-instance`、`smoke:tray`、`smoke:note`、`smoke:todo`、`smoke:codex-quota`、`smoke:renderer-recovery`、`smoke:autostart`、`smoke:performance`、`smoke:portable`：均通过。待办 smoke 实际操作 Electron 渲染器的新增/勾选并检查配置落盘；自启动 smoke 只验证 packaged `Widget.exe` 的静默启动，没有登记真实启动项。
 - 性能 smoke 本机基线：manager 335.4 MB、单组件 416.9 MB、双组件 489.3 MB、Renderer recovery 314.9 MB 峰值工作集；仅作当前机器观察值。
 - `npm.cmd run package:portable`：通过；`Widget.exe`、Electron 声明、项目 `LICENSE` 和 koffi `LICENSE.txt` 均在成品中。
