@@ -32,6 +32,12 @@
 - M0 launcher 构建通过；带临时 profile、`--disable-gpu` 的 `--auto-attach` 探针退出码为 0。
 - `npm.cmd run smoke:desktop`：未通过，当前自动化会话报告 `WorkerW not found`；manager 能正常启动/退出，但无法在此会话完成真实 WorkerW 桌面层验证。
 
+### 2026-09-10 每日待办 WorkerW 输入修复尝试
+
+- 调整输入设置顺序：先设置 Electron 鼠标忽略状态，再刷新并校验 WorkerW 原生样式；修正原生写入失败判断、交互态禁止激活标志检查和 `WindowFromPoint` 的 POINT 按值绑定。
+- 本次 `npm.cmd test`：108/108 通过；`npm.cmd run smoke:todo` 通过；本机原生适配器加载成功。新增回归使用模拟 Win32 返回值覆盖写入失败和禁止激活标志残留，不能作为可见桌面输入证据。
+- 保持待办附着 WorkerW。真实鼠标点击、输入焦点和桌面层遮挡仍待重启后的实机验证，尚不能宣称用户报告的问题已解决。
+
 ### 本轮人工验证
 
 尚未将下列项目写成自动化 PASS：

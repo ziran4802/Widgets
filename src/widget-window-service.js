@@ -117,7 +117,16 @@ class WidgetWindowService {
   }
 
   hostInputSucceeded(state) {
-    return state?.lastResult?.success !== false;
+    return ['ready', 'editing'].includes(state?.phase) && state?.lastResult?.success !== false;
+  }
+
+  async applyHostInput(record) {
+    // Electron can rewrite extended styles. Refresh and verify the native
+    // WorkerW styles only after Electron has applied its mouse-ignore state.
+    this.setWindowMouseEvents(record, this.isInteractive(record));
+    const state = await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
+    if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
+    return state;
   }
 
   createRecord(component) {
@@ -288,10 +297,7 @@ class WidgetWindowService {
           await new Promise(resolve => setTimeout(resolve, 400));
         }
         if (record.hostReady) {
-          const interactive = this.isInteractive(record);
-          const state = await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
-          if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
-          this.setWindowMouseEvents(record, interactive);
+          await this.applyHostInput(record);
           if (!this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
         } else if (this.isAlive(record.window) && typeof record.window.hide === 'function') {
           record.window.hide();
@@ -475,13 +481,13 @@ class WidgetWindowService {
     record.todoInteractive = next;
     const apply = async () => {
       if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
-        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
-        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
+        const state = await this.applyHostInput(record);
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);
+      } else {
+        this.setWindowMouseEvents(record, this.isInteractive(record));
       }
-      this.setWindowMouseEvents(record, this.isInteractive(record));
       this.send(record, 'widget:edit-mode', this.editModePayload(record));
     };
     try {
@@ -493,15 +499,19 @@ class WidgetWindowService {
       try {
         if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
           await this.queueHost(record, async () => {
-            const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
-            if (!this.hostInputSucceeded(state)) throw new Error('host input mode restore was not applied');
+            const state = await this.applyHostInput(record);
             record.hostPhase = state?.phase || record.hostPhase;
             record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
             this.notifyHostState(record, state);
           });
+        } else {
+          this.setWindowMouseEvents(record, this.isInteractive(record));
         }
-      } catch {}
-      this.setWindowMouseEvents(record, this.isInteractive(record));
+      } catch {
+        record.hostReady = false;
+        record.hostPhase = 'unavailable';
+        if (this.isAlive(record.window)) record.window.hide?.();
+      }
       this.send(record, 'widget:edit-mode', this.editModePayload(record));
       return { ok: false, errorCode: 'TODO_INTERACTION_FAILED' };
     }
@@ -532,13 +542,11 @@ class WidgetWindowService {
           if (this.isAlive(record.window) && typeof record.window.hide === 'function') record.window.hide();
           return;
         }
-        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
-        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
+        const state = await this.applyHostInput(record);
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         record.hostMode = record.hostReady ? 'desktop' : 'floating';
         this.notifyHostState(record, state);
-        this.setWindowMouseEvents(record, this.isInteractive(record));
         this.send(record, 'widget:edit-mode', this.editModePayload(record));
         if (record.hostReady && !this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
       }).catch(error => {
@@ -572,16 +580,10 @@ class WidgetWindowService {
     this.send(record, 'widget:edit-mode', this.editModePayload(record));
     if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
       this.queueHost(record, async () => {
-        const interactive = this.isInteractive(record);
-        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
-        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
+        const state = await this.applyHostInput(record);
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);
-        // Electron's mouse-ignore flag must be applied after the native
-        // WS_EX_* transition, otherwise the two APIs can restore opposing
-        // input styles on a reparented WorkerW child.
-        this.setWindowMouseEvents(record, interactive);
       }).catch(() => {});
     }
     return true;

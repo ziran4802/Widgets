@@ -309,7 +309,12 @@ test('keeps the daily todo widget interactive while attached to WorkerW', async 
     adapter: { registerWindow() {} },
     async create(component) { calls.push(['create', component.instanceId]); return { phase: 'created' }; },
     async attach(instanceId) { calls.push(['attach', instanceId]); return { phase: 'ready', instanceId, mode: 'locked' }; },
-    async setInputMode(instanceId, mode) { calls.push(['input', instanceId, mode]); return { phase: mode === 'editing' ? 'editing' : 'ready', instanceId, mode }; },
+    async setInputMode(instanceId, mode) {
+      // The native style refresh must see Electron's final input state.
+      assert.equal(created[0].ignoreMouseEvents?.ignore, false);
+      calls.push(['input', instanceId, mode]);
+      return { phase: mode === 'editing' ? 'editing' : 'ready', instanceId, mode };
+    },
     async setGeometry() { return { phase: 'ready' }; },
     async destroy() { return { ok: true }; }
   };

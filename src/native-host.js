@@ -63,7 +63,8 @@ function loadNativeHostAdapter(options = {}) {
     const GetWindowRect = user32.func('bool GetWindowRect(uintptr_t window, _Out_ void * rect)');
     const GetClientRect = user32.func('bool GetClientRect(uintptr_t window, _Out_ void * rect)');
     const ClientToScreen = user32.func('bool ClientToScreen(uintptr_t window, _Inout_ void * point)');
-    const WindowFromPoint = user32.func('uintptr_t WindowFromPoint(_In_ void * point)');
+    const POINT = koffi.struct({ x: 'int32_t', y: 'int32_t' });
+    const WindowFromPoint = user32.func('WindowFromPoint', 'uintptr_t', [POINT]);
     const SetCapture = user32.func('uintptr_t SetCapture(uintptr_t window)');
     const ReleaseCapture = user32.func('bool ReleaseCapture()');
     const GetCapture = user32.func('uintptr_t GetCapture()');
@@ -100,7 +101,7 @@ function loadNativeHostAdapter(options = {}) {
       SetLastError(0);
       const previous = SetWindowLongPtrW(window, index, value);
       const error = Number(GetLastError());
-      return { ok: previous !== 0n || previous !== 0 || error === 0, previous, error };
+      return { ok: asBigInt(previous) !== 0n || error === 0, previous, error };
     }
 
     function locateWorkerW() {
@@ -142,7 +143,8 @@ function loadNativeHostAdapter(options = {}) {
       // reparented WS_CHILD window, so only TOOLWINDOW is required there.
       const required = mode === 'editing' ? WS_EX_TOOLWINDOW : WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
       const transparentValid = mode === 'editing' ? (exStyle & WS_EX_TRANSPARENT) === 0 : (exStyle & WS_EX_TRANSPARENT) === WS_EX_TRANSPARENT;
-      const structureValid = Boolean(state?.worker && workerRoot && parent === state.worker && ancestor === workerRoot && (style & WS_CHILD) === WS_CHILD && (exStyle & required) === required && transparentValid);
+      const activationValid = mode !== 'editing' || (exStyle & WS_EX_NOACTIVATE) === 0;
+      const structureValid = Boolean(state?.worker && workerRoot && parent === state.worker && ancestor === workerRoot && (style & WS_CHILD) === WS_CHILD && (exStyle & required) === required && transparentValid && activationValid);
       const clientValid = Boolean(actualClient && withinTolerance(actualClient, expectedPhysical, 1));
       const outerValid = Boolean(outer && withinTolerance(outer, expectedPhysical, 1));
       return { nativeAvailable: true, operation, mode, child, parent, ancestor, worker: state?.worker || 0n, workerRoot, parentClass: className(parent), workerClass: className(state?.worker || 0n), style, exStyle, outer, actualClient, expectedPhysical, scaleFactor, structureValid, clientValid, outerValid, success: structureValid && clientValid, errors: [] };
@@ -232,9 +234,7 @@ function loadNativeHostAdapter(options = {}) {
 
     function samplePoint(window, point) {
       const child = hwndFromElectron(window, koffi);
-      const nativePoint = Buffer.alloc(8);
-      nativePoint.writeInt32LE(Math.trunc(point.x), 0);
-      nativePoint.writeInt32LE(Math.trunc(point.y), 4);
+      const nativePoint = { x: Math.trunc(point.x), y: Math.trunc(point.y) };
       const hitWindow = asBigInt(WindowFromPoint(nativePoint));
       const hitParent = asBigInt(GetParent(hitWindow));
       const hitAncestor = asBigInt(GetAncestor(hitWindow, GA_ROOT));
