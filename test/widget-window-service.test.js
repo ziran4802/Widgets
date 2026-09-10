@@ -303,7 +303,7 @@ test('coordinates a registered window with HostService when WorkerW mode is enab
   assert.equal(calls.some(call => call[0] === 'destroy'), true);
 });
 
-test('keeps the daily todo widget interactive while attached to WorkerW', async () => {
+test('keeps the daily todo widget interactive in a regular floating window', async () => {
   const calls = [];
   const hostService = {
     adapter: { registerWindow() {} },
@@ -326,7 +326,10 @@ test('keeps the daily todo widget interactive while attached to WorkerW', async 
   const window = created[0];
   window.webContents.emit('did-finish-load');
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(calls.at(-1), ['input', 'daily-todo-1', 'editing']);
+  const record = [...service.windows.values()][0];
+  assert.equal(record.hostMode, 'floating');
+  assert.equal(record.hostReady, true);
+  assert.equal(calls.length, 0);
   assert.deepEqual(window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
 });
 
@@ -356,16 +359,21 @@ test('toggles daily todo desktop interaction without changing its component conf
   assert.deepEqual(locked, { ok: true, interactive: false });
   await record.hostTask;
   assert.deepEqual(record.window.ignoreMouseEvents, { ignore: true, options: { forward: true } });
-  assert.equal(calls.at(-1)[2], 'locked');
+  assert.equal(calls.length, 0);
   assert.equal(record.component.locked, true);
   assert.equal(record.component.type, 'daily-todo');
   assert.equal(record.window.sent.at(-1).payload.interactive, false);
+
+  service.setEditMode(todo.instanceId, true);
+  assert.deepEqual(record.window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
+  service.setEditMode(todo.instanceId, false);
+  assert.deepEqual(record.window.ignoreMouseEvents, { ignore: true, options: { forward: true } });
 
   const unlocked = await service.setTodoInteraction(todo.instanceId, true);
   assert.deepEqual(unlocked, { ok: true, interactive: true });
   await record.hostTask;
   assert.deepEqual(record.window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
-  assert.equal(calls.at(-1)[2], 'editing');
+  assert.equal(calls.length, 0);
   assert.equal(record.window.sent.at(-1).payload.interactive, true);
 });
 
@@ -384,8 +392,7 @@ test('does not keep a WorkerW widget visible as interactive when native input mo
     pagePath: 'widget.html',
     hostService
   });
-  const todo = component({ instanceId: 'daily-todo-1', type: 'daily-todo', displayName: '每日待办' });
-  service.sync(snapshot([todo]));
+  service.sync(snapshot([component()]));
   const record = [...service.windows.values()][0];
   await record.hostTask;
   assert.equal(record.hostReady, false);

@@ -6,7 +6,7 @@
 
 - Electron manager、主屏 WorkerW 组件窗口、托盘生命周期和统一退出清理。
 - 系统监测（CPU/内存/GPU 与物理网络速率）、时钟/日期、纯文本便签、每日待办和可选 Codex 额度组件。
-- 每日待办当前支持本地当天任务的新增、勾选、进度显示和持久化；桌面默认可直接交互，标题条可锁定/恢复交互，锁定后可从托盘解锁；跨日自动清空，不保存历史或提醒。
+- 每日待办当前支持本地当天任务的新增、勾选、进度显示和持久化；使用普通透明浮动窗口保证桌面默认可直接交互，标题条可锁定/恢复交互，锁定后可从托盘解锁；跨日自动清空，不保存历史或提醒。
 - 组件目录分页、单实例、紧凑实例列表分页、布局编辑、保存/取消、主题/透明度/锁定设置、配置持久化和 Renderer 恢复。
 - Windows 当前用户自启动代码仅对正式 portable `Widget.exe` 开放；开发版、M0 探针和非 portable 路径不会改真实启动项。
 - portable 文件夹打包和独立 M0 WorkerW 研究入口。
@@ -26,7 +26,7 @@
 - 迁移完成时的 Node 基线为 95/95；加入每日待办后的 `npm.cmd test`：100/100 通过。
 - `smoke:manager`、`smoke:manager-ui`、`smoke:single-instance`、`smoke:tray`、`smoke:note`、`smoke:todo`、`smoke:codex-quota`、`smoke:renderer-recovery`、`smoke:autostart`、`smoke:performance`、`smoke:portable`：均通过。待办 smoke 实际操作 Electron 渲染器的新增/勾选并检查配置落盘；自启动 smoke 只验证 packaged `Widget.exe` 的静默启动，没有登记真实启动项。
 - 管理器分页改造本轮：`npm.cmd test` 为 103/103；`npm.cmd run smoke:manager-ui` 通过，覆盖 1120×800 默认页（目录 3 张/页、实例 5 行）、800×640 紧凑页（目录 2 张/页、实例 3 行）、目录首末页、最后一页卡片宽度、页面切换、编辑面板替换和页面高度无滚动条。实际 Electron 页面抓图位于仓库外的 `manager-1120x800.png` 与 `manager-800x640.png`，不是概念图。
-- 每日待办桌面交互改造：`npm.cmd test` 为 105/105；新增 WorkerW 输入模式的锁定/解锁回归、原生输入样式刷新及失败状态回归，并保留托盘菜单状态回归。运行时锁定不会写入 `locked` 或待办配置；待办保存 smoke 仍覆盖渲染器新增/勾选与配置落盘。修复后的 portable 副本已完成启动生命周期 smoke。
+- 每日待办桌面交互改造：`npm.cmd test` 为 105/105；每日待办改用普通浮动窗口，新增运行时锁定/解锁、布局编辑时输入恢复及配置不变回归，并保留 WorkerW 输入样式刷新和失败状态防护。运行时锁定不会写入 `locked` 或待办配置；待办保存 smoke 仍覆盖渲染器新增/勾选与配置落盘。修复后的 portable 副本已完成启动生命周期 smoke。
 - 性能 smoke 本机基线：manager 335.4 MB、单组件 416.9 MB、双组件 489.3 MB、Renderer recovery 314.9 MB 峰值工作集；仅作当前机器观察值。
 - `npm.cmd run package:portable`：通过；`Widget.exe`、Electron 声明、项目 `LICENSE` 和 koffi `LICENSE.txt` 均在成品中。
 - M0 launcher 构建通过；带临时 profile、`--disable-gpu` 的 `--auto-attach` 探针退出码为 0。
