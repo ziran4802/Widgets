@@ -468,7 +468,11 @@ function renderDailyTodo(view) {
   add.addEventListener('submit', event => {
     event.preventDefault();
     const title = input.value.trim();
-    if (!title || todoItemsForToday().length >= 64) return;
+    if (!title) {
+      input.focus();
+      return;
+    }
+    if (todoItemsForToday().length >= 64) return;
     const next = [...todoItemsForToday(), { id: `todo-${Date.now()}-${++todoItemSequence}`, title, completed: false }];
     input.value = '';
     localTodoState(next);

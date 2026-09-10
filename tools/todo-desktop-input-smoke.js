@@ -126,7 +126,10 @@ app.whenReady().then(async () => {
       await pause(250);
     }
 
-    await click('.todo-add input');
+    await click('.todo-add-button');
+    result.emptyAddFocused = await record.window.webContents.executeJavaScript(
+      "document.activeElement === document.querySelector('.todo-add input')");
+    if (!result.emptyAddFocused) throw new Error('empty add did not focus the task input');
     result.focus = BigInt(getFocus()) === hwnd;
     if (!result.focus) throw new Error('native keyboard focus not obtained');
     const input = Buffer.alloc(80); // Two Windows x64 INPUT records, Unicode a down/up.
