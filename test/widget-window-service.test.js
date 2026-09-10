@@ -369,6 +369,30 @@ test('toggles daily todo desktop interaction without changing its component conf
   assert.equal(record.window.sent.at(-1).payload.interactive, true);
 });
 
+test('does not keep a WorkerW widget visible as interactive when native input mode fails', async () => {
+  const hostService = {
+    adapter: { registerWindow() {} },
+    async create(component) { return { phase: 'created', instanceId: component.instanceId }; },
+    async attach(instanceId) { return { phase: 'ready', instanceId }; },
+    async setInputMode(instanceId, mode) { return { phase: 'ready', instanceId, mode, lastResult: { success: false, errors: ['style refresh failed'] } }; },
+    async setGeometry() { return { phase: 'ready' }; },
+    async destroy() { return { ok: true }; }
+  };
+  const service = new WidgetWindowService({
+    createWindow: options => new FakeWindow(options),
+    preloadPath: 'widget-preload.js',
+    pagePath: 'widget.html',
+    hostService
+  });
+  const todo = component({ instanceId: 'daily-todo-1', type: 'daily-todo', displayName: '每日待办' });
+  service.sync(snapshot([todo]));
+  const record = [...service.windows.values()][0];
+  await record.hostTask;
+  assert.equal(record.hostReady, false);
+  assert.equal(record.hostPhase, 'unavailable');
+  assert.equal(record.window.hidden, true);
+});
+
 test('moves a WorkerW widget from native mouse messages and captures the pointer', async () => {
   const calls = [];
   const hostService = {

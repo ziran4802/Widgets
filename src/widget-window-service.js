@@ -116,6 +116,10 @@ class WidgetWindowService {
     return this.isInteractive(record) ? 'editing' : 'locked';
   }
 
+  hostInputSucceeded(state) {
+    return state?.lastResult?.success !== false;
+  }
+
   createRecord(component) {
     const record = { component: clone(component), loaded: false, window: undefined, editing: false, todoInteractive: component.type === 'daily-todo', moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
@@ -285,7 +289,8 @@ class WidgetWindowService {
         }
         if (record.hostReady) {
           const interactive = this.isInteractive(record);
-          await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
+          const state = await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
+          if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
           this.setWindowMouseEvents(record, interactive);
           if (!this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
         } else if (this.isAlive(record.window) && typeof record.window.hide === 'function') {
@@ -471,6 +476,7 @@ class WidgetWindowService {
     const apply = async () => {
       if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
         const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);
@@ -488,6 +494,7 @@ class WidgetWindowService {
         if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
           await this.queueHost(record, async () => {
             const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+            if (!this.hostInputSucceeded(state)) throw new Error('host input mode restore was not applied');
             record.hostPhase = state?.phase || record.hostPhase;
             record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
             this.notifyHostState(record, state);
@@ -526,6 +533,7 @@ class WidgetWindowService {
           return;
         }
         const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         record.hostMode = record.hostReady ? 'desktop' : 'floating';
@@ -566,6 +574,7 @@ class WidgetWindowService {
       this.queueHost(record, async () => {
         const interactive = this.isInteractive(record);
         const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);

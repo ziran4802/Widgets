@@ -10,6 +10,8 @@ const WS_EX_NOACTIVATE = 0x08000000;
 const GA_ROOT = 2;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_NOZORDER = 0x0004;
+const SWP_NOSIZE = 0x0001;
+const SWP_NOMOVE = 0x0002;
 const SWP_FRAMECHANGED = 0x0020;
 
 function asBigInt(value) {
@@ -196,9 +198,19 @@ function loadNativeHostAdapter(options = {}) {
         ? (current & ~(WS_EX_TRANSPARENT | WS_EX_NOACTIVATE)) | WS_EX_TOOLWINDOW
         : current | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
       const write = setWindowLongPtrChecked(child, GWL_EXSTYLE, next);
+      // Reparented Electron windows can keep their old hit-test behavior until
+      // Windows is told to recalculate the non-client/style state. Without
+      // this refresh the renderer can report an interactive mode while the
+      // WorkerW child still behaves as click-through.
+      SetLastError(0);
+      const refreshed = SetWindowPos(child, 0n, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+      const refreshError = refreshed ? 0 : Number(GetLastError());
       const observation = observe(window, state, bounds, state.scaleFactor || 1, mode, 'input');
-      if (write.ok && observation.structureValid) state.inputMode = mode;
-      return { ...observation, write, success: write.ok && observation.structureValid, errors: write.ok ? observation.errors : [`SetWindowLongPtr(exStyle) failed:${write.error}`, ...observation.errors] };
+      if (write.ok && refreshed && observation.structureValid) state.inputMode = mode;
+      const errors = [];
+      if (!write.ok) errors.push(`SetWindowLongPtr(exStyle) failed:${write.error}`);
+      if (!refreshed) errors.push(`SetWindowPos(style refresh) failed:${refreshError}`);
+      return { ...observation, write, refreshed, refreshError, success: write.ok && refreshed && observation.structureValid, errors: [...errors, ...observation.errors] };
     }
 
     function setGeometry(window, state, bounds) {
