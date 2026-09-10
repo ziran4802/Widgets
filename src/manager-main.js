@@ -180,6 +180,7 @@ function createTrayRuntime() {
     icon: createTrayIcon(),
     onOpen: openManagerFromTray,
     onToggleComponents: toggleTemporaryComponents,
+    onToggleTodoInteraction: toggleTodoInteractionFromTray,
     onEditLayout: editLayoutFromTray,
     onSettings: settingsFromTray,
     onExit: () => { void requestExit('tray-exit'); },
@@ -264,6 +265,10 @@ function todoSaveFailure(code = 'TODO_SAVE_FAILED') {
   return { schemaVersion: 1, ok: false, errorCode: code, message: '待办保存失败，请重试' };
 }
 
+function todoInteractionFailure(code = 'TODO_INTERACTION_FAILED') {
+  return { schemaVersion: 1, ok: false, errorCode: code, message: '待办交互状态切换失败，请重试' };
+}
+
 async function saveNoteFromWidget(event, payload) {
   if (quitting) return noteSaveFailure('APP_EXITING');
   const record = widgetWindows?.findRecordBySender(event.sender);
@@ -306,6 +311,48 @@ async function saveTodoFromWidget(event, payload) {
     });
   } catch {
     return todoSaveFailure('APP_EXITING');
+  }
+}
+
+async function setTodoInteractionFromWidget(event, interactive) {
+  if (quitting) return todoInteractionFailure('APP_EXITING');
+  if (event?.senderFrame !== event?.sender?.mainFrame) return todoInteractionFailure('UNAUTHORIZED_SENDER');
+  if (typeof interactive !== 'boolean') return todoInteractionFailure('INVALID_TODO_INTERACTION');
+  const record = widgetWindows?.findRecordBySender(event.sender);
+  if (!record || record.component.type !== 'daily-todo') return todoInteractionFailure('UNAUTHORIZED_SENDER');
+  try {
+    const result = await operationQueue.enqueue(() => widgetWindows.setTodoInteraction(record.component.instanceId, interactive));
+    if (result?.ok !== true) return todoInteractionFailure(result?.errorCode);
+    trayService?.setTodoInteractionState(result.interactive === true);
+    return { schemaVersion: 1, ok: true, interactive: result.interactive === true };
+  } catch {
+    return todoInteractionFailure();
+  }
+}
+
+async function toggleTodoInteractionFromTray(interactive) {
+  if (activeEditSessionId) {
+    notifyTrayActionBlocked();
+    return false;
+  }
+  if (typeof interactive !== 'boolean') return false;
+  const record = [...(widgetWindows?.windows?.values() || [])].find(candidate => candidate.component.type === 'daily-todo');
+  if (!record) {
+    report('todo-interaction', { result: 'FAIL', reason: 'daily todo window unavailable' });
+    return false;
+  }
+  try {
+    const result = await operationQueue.enqueue(() => widgetWindows.setTodoInteraction(record.component.instanceId, interactive));
+    if (result?.ok !== true) {
+      report('todo-interaction', { result: 'FAIL', reason: result?.errorCode || 'runtime toggle failed' });
+      return false;
+    }
+    trayService?.setTodoInteractionState(result.interactive === true);
+    report('todo-interaction', { result: result.interactive ? 'ENABLED' : 'LOCKED', source: 'tray', instanceId: record.component.instanceId });
+    return true;
+  } catch {
+    report('todo-interaction', { result: 'FAIL', reason: 'runtime toggle failed' });
+    return false;
   }
 }
 
@@ -642,6 +689,7 @@ async function start() {
   });
   ipcMain.handle('widget:note-save', (event, payload) => saveNoteFromWidget(event, payload));
   ipcMain.handle('widget:todo-update', (event, payload) => saveTodoFromWidget(event, payload));
+  ipcMain.handle('widget:todo-interaction', (event, interactive) => setTodoInteractionFromWidget(event, interactive));
   ipcMain.handle('widget:drag', (event, operation, pointerId) => dragFromWidget(event, operation, pointerId));
   ipcMain.handle('widget:codex-quota-refresh', (event) => refreshCodexQuotaFromWidget(event));
   ipcMain.handle('manager:autostart', async (event, action) => {

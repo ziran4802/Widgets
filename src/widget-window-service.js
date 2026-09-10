@@ -101,11 +101,15 @@ class WidgetWindowService {
   }
 
   editModePayload(record) {
-    return { editing: record.editing, dragMode: record.hostMode === 'desktop' ? 'native-message' : 'electron-native' };
+    return {
+      editing: record.editing,
+      dragMode: record.hostMode === 'desktop' ? 'native-message' : 'electron-native',
+      interactive: record.component.type === 'daily-todo' ? record.todoInteractive !== false : true
+    };
   }
 
   isInteractive(record) {
-    return Boolean(record?.editing || record?.component?.type === 'daily-todo');
+    return Boolean(record?.editing || (record?.component?.type === 'daily-todo' && record.todoInteractive !== false));
   }
 
   inputMode(record) {
@@ -113,7 +117,7 @@ class WidgetWindowService {
   }
 
   createRecord(component) {
-    const record = { component: clone(component), loaded: false, window: undefined, editing: false, moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
+    const record = { component: clone(component), loaded: false, window: undefined, editing: false, todoInteractive: component.type === 'daily-todo', moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
     if (!record.window) throw new Error('widget window could not be created');
     this.windows.set(component.instanceId, record);
@@ -455,6 +459,44 @@ class WidgetWindowService {
       this.sendCurrent(record);
       if (component.visible && record.hostReady && !this.temporaryHidden && typeof record.window.show === 'function') record.window.show();
       if ((!component.visible || this.temporaryHidden) && typeof record.window.hide === 'function') record.window.hide();
+    }
+  }
+
+  async setTodoInteraction(instanceId, interactive) {
+    const record = this.windows.get(instanceId);
+    if (!record || record.component.type !== 'daily-todo' || typeof interactive !== 'boolean') return { ok: false, errorCode: 'INVALID_TODO_INTERACTION' };
+    const previous = record.todoInteractive !== false;
+    const next = interactive;
+    record.todoInteractive = next;
+    const apply = async () => {
+      if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
+        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        record.hostPhase = state?.phase || record.hostPhase;
+        record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
+        this.notifyHostState(record, state);
+      }
+      this.setWindowMouseEvents(record, this.isInteractive(record));
+      this.send(record, 'widget:edit-mode', this.editModePayload(record));
+    };
+    try {
+      if (this.hostService && record.hostMode === 'desktop' && record.hostReady) await this.queueHost(record, apply);
+      else await apply();
+      return { ok: true, interactive: next };
+    } catch {
+      record.todoInteractive = previous;
+      try {
+        if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
+          await this.queueHost(record, async () => {
+            const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+            record.hostPhase = state?.phase || record.hostPhase;
+            record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
+            this.notifyHostState(record, state);
+          });
+        }
+      } catch {}
+      this.setWindowMouseEvents(record, this.isInteractive(record));
+      this.send(record, 'widget:edit-mode', this.editModePayload(record));
+      return { ok: false, errorCode: 'TODO_INTERACTION_FAILED' };
     }
   }
 

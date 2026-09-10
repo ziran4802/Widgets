@@ -1,19 +1,20 @@
 class TrayService {
-  constructor({ Tray, Menu, icon, toolTip = 'Widget', onOpen, onToggleComponents, onEditLayout, onSettings, onExit, onError = () => {}, healthCheckMs = 5000 } = {}) {
+  constructor({ Tray, Menu, icon, toolTip = 'Widget', onOpen, onToggleComponents, onToggleTodoInteraction, onEditLayout, onSettings, onExit, onError = () => {}, healthCheckMs = 5000 } = {}) {
     if (typeof Tray !== 'function') throw new TypeError('Tray constructor is required');
     if (!Menu || typeof Menu.buildFromTemplate !== 'function') throw new TypeError('Menu.buildFromTemplate is required');
-    if (typeof onOpen !== 'function' || typeof onToggleComponents !== 'function' || typeof onEditLayout !== 'function' || typeof onSettings !== 'function' || typeof onExit !== 'function') throw new TypeError('tray callbacks are required');
+    if (typeof onOpen !== 'function' || typeof onToggleComponents !== 'function' || typeof onToggleTodoInteraction !== 'function' || typeof onEditLayout !== 'function' || typeof onSettings !== 'function' || typeof onExit !== 'function') throw new TypeError('tray callbacks are required');
     this.Tray = Tray;
     this.Menu = Menu;
     this.icon = icon;
     this.toolTip = toolTip;
-    this.callbacks = { onOpen, onToggleComponents, onEditLayout, onSettings, onExit };
+    this.callbacks = { onOpen, onToggleComponents, onToggleTodoInteraction, onEditLayout, onSettings, onExit };
     this.onError = onError;
     this.healthCheckMs = healthCheckMs;
     this.tray = undefined;
     this.menu = undefined;
     this.healthTimer = undefined;
     this.componentsHidden = false;
+    this.todoInteractive = true;
   }
 
   isReady() {
@@ -25,6 +26,7 @@ class TrayService {
       { label: '打开管理器', click: () => this.callbacks.onOpen() },
       { type: 'separator' },
       { label: this.componentsHidden ? '恢复显示组件' : '暂时隐藏全部组件', click: () => this.callbacks.onToggleComponents(!this.componentsHidden) },
+      { label: this.todoInteractive ? '锁定每日待办' : '解锁每日待办', click: () => this.toggleTodoInteraction() },
       { label: '编辑布局', click: () => this.callbacks.onEditLayout() },
       { label: '设置', click: () => this.callbacks.onSettings() },
       { type: 'separator' },
@@ -64,6 +66,26 @@ class TrayService {
   setComponentsHidden(hidden) {
     this.componentsHidden = Boolean(hidden);
     this.rebuildMenu();
+  }
+
+  setTodoInteractionState(interactive) {
+    this.todoInteractive = Boolean(interactive);
+    this.rebuildMenu();
+  }
+
+  toggleTodoInteraction() {
+    const next = !this.todoInteractive;
+    let result;
+    try { result = this.callbacks.onToggleTodoInteraction(next); } catch { return false; }
+    const commit = success => {
+      if (success === true) this.setTodoInteractionState(next);
+      return success === true;
+    };
+    if (result && typeof result.then === 'function') {
+      void Promise.resolve(result).then(commit).catch(() => false);
+      return true;
+    }
+    return commit(result);
   }
 
   checkHealth() {

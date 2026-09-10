@@ -330,6 +330,45 @@ test('keeps the daily todo widget interactive while attached to WorkerW', async 
   assert.deepEqual(window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
 });
 
+test('toggles daily todo desktop interaction without changing its component config', async () => {
+  const calls = [];
+  const hostService = {
+    adapter: { registerWindow() {} },
+    async create(component) { calls.push(['create', component.instanceId]); return { phase: 'created' }; },
+    async attach(instanceId) { calls.push(['attach', instanceId]); return { phase: 'ready', instanceId, mode: 'locked' }; },
+    async setInputMode(instanceId, mode) { calls.push(['input', instanceId, mode]); return { phase: mode === 'editing' ? 'editing' : 'ready', instanceId, mode }; },
+    async setGeometry() { return { phase: 'ready' }; },
+    async destroy() { return { ok: true }; }
+  };
+  const service = new WidgetWindowService({
+    createWindow: options => new FakeWindow(options),
+    preloadPath: 'widget-preload.js',
+    pagePath: 'widget.html',
+    hostService
+  });
+  const todo = component({ instanceId: 'daily-todo-1', type: 'daily-todo', displayName: '每日待办', locked: true });
+  service.sync(snapshot([todo]));
+  const record = [...service.windows.values()][0];
+  await record.hostTask;
+  record.window.webContents.emit('did-finish-load');
+
+  const locked = await service.setTodoInteraction(todo.instanceId, false);
+  assert.deepEqual(locked, { ok: true, interactive: false });
+  await record.hostTask;
+  assert.deepEqual(record.window.ignoreMouseEvents, { ignore: true, options: { forward: true } });
+  assert.equal(calls.at(-1)[2], 'locked');
+  assert.equal(record.component.locked, true);
+  assert.equal(record.component.type, 'daily-todo');
+  assert.equal(record.window.sent.at(-1).payload.interactive, false);
+
+  const unlocked = await service.setTodoInteraction(todo.instanceId, true);
+  assert.deepEqual(unlocked, { ok: true, interactive: true });
+  await record.hostTask;
+  assert.deepEqual(record.window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
+  assert.equal(calls.at(-1)[2], 'editing');
+  assert.equal(record.window.sent.at(-1).payload.interactive, true);
+});
+
 test('moves a WorkerW widget from native mouse messages and captures the pointer', async () => {
   const calls = [];
   const hostService = {

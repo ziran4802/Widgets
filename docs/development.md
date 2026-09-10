@@ -69,7 +69,7 @@ npm.cmd run smoke:portable
 
 smoke 脚本应使用临时配置、临时 Electron profile 和临时工作目录，并在结束时清理自己创建的范围。manager UI smoke 还会覆盖目录首末页、窗口缩放后的页容量、编辑面板替换和滚动高度检查；需要图片证据时使用 `WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR` 将抓图放在仓库外。自动化自启动 smoke 只验证 `--autostart --silent-autostart` 行为，不注册真实当前用户启动项。
 
-每日待办配置保存在组件私有配置中：`dateKey` 是本地日期，`items` 最多 64 条，每条只包含稳定 `id`、纯文本 `title` 和 `completed`。Widget 启动时检测日期变化并清空上一日任务；运行中跨午夜的刷新由组件窗口定时检查完成。交互通过 `widget-preload.js` 暴露的受控 IPC 保存，不直接访问文件系统。
+每日待办配置保存在组件私有配置中：`dateKey` 是本地日期，`items` 最多 64 条，每条只包含稳定 `id`、纯文本 `title` 和 `completed`。Widget 启动时检测日期变化并清空上一日任务；运行中跨午夜的刷新由组件窗口定时检查完成。新增和勾选通过 `widget-preload.js` 暴露的受控 IPC 保存，不直接访问文件系统。桌面交互默认开启；标题条锁定按钮和托盘菜单只切换窗口运行时输入模式，不新增或修改配置字段，锁定后可由托盘恢复。
 
 portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生成的 `Widget.exe` 以及 `resources/app/LICENSE` 属于成品，不提交到 Git。Electron runtime 自带的 `LICENSE` / `LICENSES.chromium.html` 与 koffi 包内的许可证（当前包为 `LICENSE.txt`）保持独立，不以项目 MIT 文件覆盖它们。
 
