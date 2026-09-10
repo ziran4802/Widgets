@@ -116,20 +116,14 @@ class WidgetWindowService {
     return this.isInteractive(record) ? 'editing' : 'locked';
   }
 
-  shouldUseHost(component) {
-    return Boolean(this.hostService && component?.type !== 'daily-todo');
-  }
-
   hostInputSucceeded(state) {
     return state?.lastResult?.success !== false;
   }
 
   createRecord(component) {
-    const useHost = this.shouldUseHost(component);
-    const record = { component: clone(component), loaded: false, window: undefined, editing: false, todoInteractive: component.type === 'daily-todo', moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: useHost ? 'desktop' : 'floating', hostReady: !useHost, hostPhase: useHost ? 'creating' : 'floating', hostTask: Promise.resolve() };
+    const record = { component: clone(component), loaded: false, window: undefined, editing: false, todoInteractive: component.type === 'daily-todo', moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
     if (!record.window) throw new Error('widget window could not be created');
-    if (component.type === 'daily-todo') this.setWindowMouseEvents(record, true);
     this.windows.set(component.instanceId, record);
     const handleRenderProcessGone = (_event, details = {}) => {
       if (this.closing || record.suppressRecovery || !this.isAlive(record.window)) return;
@@ -164,7 +158,7 @@ class WidgetWindowService {
       const loading = record.window.loadFile(this.pagePath);
       if (loading && typeof loading.catch === 'function') loading.catch(() => {});
     } catch {}
-    if (useHost) this.startHost(record);
+    if (this.hostService) this.startHost(record);
     return record;
   }
 
@@ -517,7 +511,7 @@ class WidgetWindowService {
     const record = this.windows.get(instanceId);
     if (!record) return false;
     const nextEditing = Boolean(editing);
-    const canSwitchHost = Boolean(this.shouldUseHost(record.component) && typeof this.hostService.detach === 'function' && typeof this.hostService.attach === 'function');
+    const canSwitchHost = Boolean(this.hostService && typeof this.hostService.detach === 'function' && typeof this.hostService.attach === 'function');
     record.editing = nextEditing;
     if (!record.editing) record.moveSequence += 1;
     if (!record.editing && (record.drag || record.nativeDrag)) {
@@ -575,7 +569,6 @@ class WidgetWindowService {
       return true;
     }
     if (this.isAlive(record.window) && typeof record.window.setMovable === 'function') record.window.setMovable(record.editing);
-    if (record.component.type === 'daily-todo') this.setWindowMouseEvents(record, this.isInteractive(record));
     this.send(record, 'widget:edit-mode', this.editModePayload(record));
     if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
       this.queueHost(record, async () => {
