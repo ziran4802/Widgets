@@ -25,7 +25,7 @@
 - `npm.cmd ci --registry=https://registry.npmjs.org/`：通过，安装 14 个包并报告 0 vulnerabilities；根 `postinstall` 自动补齐 Electron runtime。
 - 迁移完成时的 Node 基线为 95/95；加入每日待办后的 `npm.cmd test`：100/100 通过。
 - `smoke:manager`、`smoke:manager-ui`、`smoke:single-instance`、`smoke:tray`、`smoke:note`、`smoke:todo`、`smoke:codex-quota`、`smoke:renderer-recovery`、`smoke:autostart`、`smoke:performance`、`smoke:portable`：均通过。待办 smoke 实际操作 Electron 渲染器的新增/勾选并检查配置落盘；自启动 smoke 只验证 packaged `Widget.exe` 的静默启动，没有登记真实启动项。
-- 管理器分页改造本轮：`npm.cmd test` 为 103/103；`npm.cmd run smoke:manager-ui` 通过，覆盖 1120×800 默认页（目录 3 张/页、实例 5 行）、800×640 紧凑页（目录 2 张/页、实例 3 行）、目录首末页、最后一页卡片宽度、页面切换、编辑面板替换和文档高度无滚动条。实际 Electron 页面抓图位于仓库外的 `manager-1120x800.png` 与 `manager-800x640.png`，不是概念图。
+- 管理器分页改造本轮：`npm.cmd test` 为 103/103；`npm.cmd run smoke:manager-ui` 通过，覆盖 1120×800 默认页（目录 3 张/页、实例 5 行）、800×640 紧凑页（目录 2 张/页、实例 3 行）、目录首末页、最后一页卡片宽度、页面切换、编辑面板替换和页面高度无滚动条。实际 Electron 页面抓图位于仓库外的 `manager-1120x800.png` 与 `manager-800x640.png`，不是概念图。
 - 性能 smoke 本机基线：manager 335.4 MB、单组件 416.9 MB、双组件 489.3 MB、Renderer recovery 314.9 MB 峰值工作集；仅作当前机器观察值。
 - `npm.cmd run package:portable`：通过；`Widget.exe`、Electron 声明、项目 `LICENSE` 和 koffi `LICENSE.txt` 均在成品中。
 - M0 launcher 构建通过；带临时 profile、`--disable-gpu` 的 `--auto-attach` 探针退出码为 0。
