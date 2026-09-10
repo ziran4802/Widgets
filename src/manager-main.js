@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, Tray } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 const { AppService } = require('./app-service');
 const { ConfigStore } = require('./config-store');
@@ -39,6 +40,29 @@ let autostartService;
 
 function report(operation, value) {
   try { appendJsonLine(reportFile, { at: new Date().toISOString(), operation, ...value }); } catch {}
+}
+
+async function captureManagerScreenshots() {
+  const outputDir = process.env.WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR;
+  if (!outputDir || !managerWindow?.webContents?.capturePage) return;
+  const original = managerWindow.getBounds();
+  const files = [];
+  try {
+    fs.mkdirSync(outputDir, { recursive: true });
+    for (const [width, height] of [[1120, 800], [800, 640]]) {
+      managerWindow.setSize(width, height);
+      await new Promise(resolve => setTimeout(resolve, 220));
+      const image = await managerWindow.webContents.capturePage();
+      const file = path.join(outputDir, `manager-${width}x${height}.png`);
+      fs.writeFileSync(file, image.toPNG());
+      files.push(file);
+    }
+  } catch (error) {
+    report('manager-ui-screenshots', { result: 'FAIL', reason: sanitizeReason(error.message) });
+  } finally {
+    managerWindow.setSize(original.width, original.height);
+  }
+  if (files.length === 2) report('manager-ui-screenshots', { result: 'PASS', files });
 }
 
 function createManagerWindow() {
@@ -391,13 +415,26 @@ function scheduleTodoSmokeTest() {
 function scheduleManagerUiSmokeTest() {
   const delayMs = Number(process.env.WIDGET_M1_TEST_MANAGER_UI_MS || 0);
   if (!Number.isFinite(delayMs) || delayMs <= 0) return;
-  setTimeout(() => {
+  setTimeout(async () => {
     if (quitting || !managerWindow?.webContents?.executeJavaScript) return;
     const script = `(() => {
-      const required = ['.app-mark img[src="widget-icon.svg"]', '.sidebar', '.nav-item[data-view="components"]', '.nav-item[data-view="appearance"]', '.nav-item[data-view="settings"]', '#catalog', '#components', '#global-theme', '#global-opacity', '#autostart-toggle', '#autostart-status'];
+      const required = ['.app-mark img[src="widget-icon.svg"]', '.sidebar', '.nav-item[data-view="components"]', '.nav-item[data-view="appearance"]', '.nav-item[data-view="settings"]', '#catalog', '#components', '#catalog-total', '#catalog-pagination', '#catalog-prev', '#catalog-page', '#catalog-next', '#component-pagination', '#component-prev', '#component-page', '#component-next', '#global-theme', '#global-opacity', '#autostart-toggle', '#autostart-status'];
       const present = required.every(selector => document.querySelector(selector));
       const cards = document.querySelectorAll('#catalog .catalog-card').length;
       const instances = document.querySelectorAll('#components .instance-card').length;
+      const catalogPagination = document.querySelector('#catalog-pagination');
+      const catalogPage = document.querySelector('#catalog-page');
+      const catalogNext = document.querySelector('#catalog-next');
+      const catalogPrevious = document.querySelector('#catalog-prev');
+      const componentPagination = document.querySelector('#component-pagination');
+      const noScrollbars = document.documentElement.scrollHeight <= document.documentElement.clientHeight && document.body.scrollHeight <= document.body.clientHeight;
+      const compactRows = [...document.querySelectorAll('#components .instance-card')].every(row => row.querySelector('.instance-status .state') && row.querySelector('.more-actions'));
+      const firstPage = cards === 3 && catalogPagination?.hidden === false && catalogPage?.textContent === '1 / 2' && catalogPrevious?.disabled === true && catalogNext?.disabled === false;
+      catalogNext?.click();
+      const lastPageCards = document.querySelectorAll('#catalog .catalog-card').length;
+      const lastPage = lastPageCards === 2 && catalogPage?.textContent === '2 / 2' && catalogPrevious?.disabled === false && catalogNext?.disabled === true;
+      const lastPageWidthsMatch = [...document.querySelectorAll('#catalog .catalog-card')].every(card => Math.abs(card.getBoundingClientRect().width - document.querySelector('#catalog .catalog-card')?.getBoundingClientRect().width) < 1);
+      catalogPrevious?.click();
       const switchNode = document.querySelector('.switch');
       const switchTrack = switchNode?.querySelector('span');
       const switchStyle = switchNode ? getComputedStyle(switchNode) : null;
@@ -411,11 +448,39 @@ function scheduleManagerUiSmokeTest() {
       const componentsVisible = document.querySelector('#page-components')?.hidden === false;
       const theme = document.querySelector('#global-theme');
       if (theme) { theme.value = 'light'; theme.dispatchEvent(new Event('change', { bubbles: true })); }
-      return { ok: present && cards === 5 && instances === 5 && switchAligned && appearanceVisible && settingsVisible && componentsVisible && theme?.value === 'light' };
+      return { ok: present && firstPage && lastPage && lastPageWidthsMatch && instances === 5 && componentPagination?.hidden === true && compactRows && noScrollbars && switchAligned && appearanceVisible && settingsVisible && componentsVisible && theme?.value === 'light' };
     })()`;
-    managerWindow.webContents.executeJavaScript(script).then(result => {
-      report('manager-ui-test', { result: result?.ok ? 'PASS' : 'FAIL' });
-    }).catch(error => report('manager-ui-test', { result: 'FAIL', reason: sanitizeReason(error.message) }));
+    try {
+      const result = await managerWindow.webContents.executeJavaScript(script);
+      await managerWindow.webContents.executeJavaScript("(() => { document.querySelector('#components .card-actions .secondary')?.click(); return true; })()");
+      await new Promise(resolve => setTimeout(resolve, 220));
+      const editorResult = await managerWindow.webContents.executeJavaScript(`(() => {
+        const editor = document.querySelector('#editor');
+        const components = document.querySelector('#page-components');
+        const noScrollbars = document.documentElement.scrollHeight <= document.documentElement.clientHeight && document.body.scrollHeight <= document.body.clientHeight;
+        const open = editor?.hidden === false && getComputedStyle(editor).display !== 'none' && getComputedStyle(components).display === 'none' && noScrollbars;
+        document.querySelector('#editor .editor-actions .secondary')?.click();
+        return { ok: open };
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 220));
+      managerWindow.setSize(800, 640);
+      await new Promise(resolve => setTimeout(resolve, 220));
+      const compactResult = await managerWindow.webContents.executeJavaScript(`(() => {
+        const cards = document.querySelectorAll('#catalog .catalog-card').length;
+        const instances = document.querySelectorAll('#components .instance-card').length;
+        const noScrollbars = document.documentElement.scrollHeight <= document.documentElement.clientHeight && document.body.scrollHeight <= document.body.clientHeight;
+        const catalogPage = document.querySelector('#catalog-page')?.textContent;
+        const componentPage = document.querySelector('#component-page')?.textContent;
+        const accessible = [...document.querySelectorAll('#components .instance-card')].every(row => row.querySelector('.card-actions button') && row.querySelector('.more-actions'));
+        return { ok: cards === 2 && instances === 3 && catalogPage === '1 / 3' && componentPage === '1 / 2' && noScrollbars && accessible };
+      })()`);
+      managerWindow.setSize(1120, 800);
+      await captureManagerScreenshots();
+      report('manager-ui-test', { result: result?.ok && editorResult?.ok && compactResult?.ok ? 'PASS' : 'FAIL', defaultSize: result, editor: editorResult, compactSize: compactResult });
+    } catch (error) {
+      managerWindow.setSize(1120, 800);
+      report('manager-ui-test', { result: 'FAIL', reason: sanitizeReason(error.message) });
+    }
   }, delayMs);
 }
 
