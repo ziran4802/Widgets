@@ -8,6 +8,7 @@
 | --- | --- |
 | `src/main.js` | Electron 入口；默认进入 manager，`--probe` / `--auto-attach` 进入 M0 探针 |
 | `src/manager-main.js` | manager 主进程、窗口编排、托盘、指标服务、额度服务和退出清理 |
+| `src/manager-renderer.js` / `src/manager-pagination.js` | manager 页面渲染、组件分页、响应式容量和编辑面板交互；分页模型可独立回归测试 |
 | `src/app-service.js` | 配置与目录业务服务 |
 | `src/catalog-state.js` | 组件目录、编辑工作副本、保存/取消状态机 |
 | `src/config-contract.js` | 配置 schema、组件类型、主题和 bounds 校验 |
@@ -41,6 +42,7 @@ npm.cmd run probe
 - `WIDGET_M1_TEST_RENDERER_CRASH_MS` / `WIDGET_M1_TEST_RENDERER_CRASH_INSTANCE`：仅供 Renderer 恢复 smoke。
 - `WIDGET_M1_TEST_CODEX_QUOTA` / `WIDGET_M1_TEST_CODEX_QUOTA_MS`：仅供额度 smoke 的内存 fixture 和 DOM 检查。
 - `WIDGET_M1_TEST_TODO_MS` / `WIDGET_M1_TEST_TODO_TITLE`：仅供每日待办 smoke 的临时 DOM 交互和保存检查。
+- `WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR`：仅供 manager UI smoke 将实际 Electron 页面抓取到指定临时目录；不应指向仓库提交路径。
 - `WIDGET_CODEX_EXECUTABLE`：可选地指定本地 Codex native executable；未指定时服务使用系统命令或已知的本机安装路径。
 - `WIDGET_M1_HOST_MODE=floating`：仅用于诊断时显式使用普通 floating 窗口；正式默认尝试 desktop WorkerW，宿主失败时组件安全隐藏，不覆盖其他程序。
 
@@ -65,7 +67,7 @@ npm.cmd run package:portable
 npm.cmd run smoke:portable
 ```
 
-smoke 脚本应使用临时配置、临时 Electron profile 和临时工作目录，并在结束时清理自己创建的范围。自动化自启动 smoke 只验证 `--autostart --silent-autostart` 行为，不注册真实当前用户启动项。
+smoke 脚本应使用临时配置、临时 Electron profile 和临时工作目录，并在结束时清理自己创建的范围。manager UI smoke 还会覆盖目录首末页、窗口缩放后的页容量、编辑面板替换和滚动高度检查；需要图片证据时使用 `WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR` 将抓图放在仓库外。自动化自启动 smoke 只验证 `--autostart --silent-autostart` 行为，不注册真实当前用户启动项。
 
 每日待办配置保存在组件私有配置中：`dateKey` 是本地日期，`items` 最多 64 条，每条只包含稳定 `id`、纯文本 `title` 和 `completed`。Widget 启动时检测日期变化并清空上一日任务；运行中跨午夜的刷新由组件窗口定时检查完成。交互通过 `widget-preload.js` 暴露的受控 IPC 保存，不直接访问文件系统。
 
