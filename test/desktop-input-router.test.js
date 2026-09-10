@@ -21,12 +21,23 @@ test('forwards a desktop click but leaves covering apps and unmatched releases a
   assert.deepEqual(f.events.map(event => event.message), [0x201, 0x202]);
 });
 
-test('completes an owned drag outside the widget and releases ownership', () => {
+test('forwards drag motion without blocking the system cursor and releases ownership', () => {
   const f = fixture();
   f.route(0x201, { x: 20, y: 20 });
-  assert.equal(f.route(0x200, { x: 130, y: 20 }), true);
+  assert.equal(f.route(0x200, { x: 130, y: 20 }), false);
+  assert.equal(f.events.at(-1).message, 0x200);
+  assert.equal(f.events.at(-1).pressed, true);
   assert.equal(f.route(0x202, { x: 130, y: 20 }), true);
   assert.equal(f.route(0x200, { x: 130, y: 20 }), false);
+});
+
+test('delivers hover motion while allowing the cursor to enter and leave the widget', () => {
+  const f = fixture();
+  assert.equal(f.route(0x200, { x: -1, y: 20 }), false);
+  assert.equal(f.route(0x200, { x: 20, y: 20 }), false);
+  assert.equal(f.route(0x200, { x: 120, y: 20 }), false);
+  assert.equal(f.events.length, 1);
+  assert.equal(f.events[0].message, 0x200);
 });
 
 test('locking, hiding or destroying the target cancels forwarding', () => {

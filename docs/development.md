@@ -76,7 +76,7 @@ portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生
 
 ## 待办桌面输入验证
 
-`npm.cmd run smoke:todo-desktop` 使用临时 Electron profile 和内存待办，在真实 WorkerW 上通过系统鼠标/键盘输入验证焦点、新增、勾选和锁定/解锁；不使用真实配置，也不通过 DOM `.click()` 触发操作。请先露出桌面上的测试区域。测试会短暂移动鼠标，结束后恢复位置。
+`npm.cmd run smoke:todo-desktop` 使用临时 Electron profile 和内存待办，在真实 WorkerW 上通过系统鼠标/键盘输入验证光标能移入组件、焦点、新增、勾选和锁定/解锁；不使用真实配置，也不通过 DOM `.click()` 触发操作。测试通过系统移动事件并回读光标坐标检查移动是否被阻挡，只有清理时才直接恢复光标位置。请先露出主屏右下方的测试区域。测试会短暂移动鼠标，结束后恢复位置。
 
 需要自动处理遮挡时可运行 `npm.cmd run smoke:todo-desktop -- --minimize-obstruction`，允许脚本短暂最小化遮挡测试点的普通应用窗口，结束后恢复其原窗口状态。此测试需要可见桌面会话，不能把无桌面的沙箱执行结果当作实机输入证据。
 

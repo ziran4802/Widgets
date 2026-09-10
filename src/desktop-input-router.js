@@ -19,7 +19,9 @@ function createInputRoute({ getTargets, inspect, deliver }) {
     if (message === DOWN) pressed = target;
     deliver(target, { message, point, x: hit.x, y: hit.y, mouseData, pressed: Boolean(pressed) });
     if (message === UP) pressed = undefined;
-    return true;
+    // The system must still receive motion to update the actual cursor. Only
+    // button/wheel events routed away from the desktop should be consumed.
+    return message !== MOVE;
   };
 }
 

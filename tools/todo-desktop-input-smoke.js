@@ -18,6 +18,7 @@ const getFocus = user32.func('uintptr_t GetFocus()');
 const getCursor = user32.func('bool GetCursorPos(_Out_ void *)');
 const setCursor = user32.func('bool SetCursorPos(int, int)');
 const mouse = user32.func('void mouse_event(uint, uint, uint, uint, uintptr_t)');
+const metric = user32.func('int GetSystemMetrics(int)');
 const sendInput = user32.func('uint SendInput(uint, _In_ void *, int)');
 const show = user32.func('bool ShowWindow(uintptr_t, int)');
 const getPlacement = user32.func('bool GetWindowPlacement(uintptr_t, _Out_ void *)');
@@ -72,7 +73,7 @@ app.whenReady().then(async () => {
       hostService: host
     });
     const todo = createDefaultComponent('daily-todo', 'input-fixture');
-    todo.bounds = { x: 20, y: display.workArea.height - 430, width: 360, height: 420, unit: 'dip' };
+    todo.bounds = { x: Math.max(0, display.workArea.width - 380), y: display.workArea.height - 430, width: 360, height: 420, unit: 'dip' };
     windows.sync({ catalog: { components: [todo] } });
     record = windows.windows.get(todo.instanceId);
     await record.hostTask;
@@ -80,6 +81,12 @@ app.whenReady().then(async () => {
     await pause(800);
     const hwnd = record.window.getNativeWindowHandle().readBigUInt64LE();
     const state = host.getRecord(todo.instanceId).hostState.nativeState;
+    await record.window.webContents.executeJavaScript(`(() => {
+      window.inputSmokeClicks = [];
+      document.addEventListener('click', event => window.inputSmokeClicks.push({
+        tag: event.target.tagName, type: event.target.type, x: event.clientX, y: event.clientY
+      }));
+    })()`);
 
     async function click(selector, retry = false) {
       const local = await record.window.webContents.executeJavaScript(`(() => {
@@ -104,7 +111,16 @@ app.whenReady().then(async () => {
         }
         throw new Error(`test point covered by ${hit.hitClass}; expose the desktop first`);
       }
-      setCursor(point.x, point.y);
+      // Send motion through the low-level hook. SetCursorPos would teleport
+      // past a hook that incorrectly suppresses WM_MOUSEMOVE.
+      mouse(0x8001, Math.ceil(point.x * 65536 / metric(0)), Math.ceil(point.y * 65536 / metric(1)), 0, 0);
+      await pause(100);
+      const actual = Buffer.alloc(8);
+      if (!getCursor(actual) || Math.abs(actual.readInt32LE(0) - point.x) > 1
+          || Math.abs(actual.readInt32LE(4) - point.y) > 1) {
+        throw new Error('system cursor could not move into the widget');
+      }
+      result.cursorMoved = true;
       mouse(2, 0, 0, 0, 0);
       mouse(4, 0, 0, 0, 0);
       await pause(250);
@@ -133,8 +149,9 @@ app.whenReady().then(async () => {
     result.unlocked = record.todoInteractive === true && enabled(state.worker);
     await windows.setTodoInteraction(todo.instanceId, false);
     result.parentRestored = enabled(state.worker) === parentBeforeUnlock;
-    if (!result.focus || result.keys !== 2 || result.text !== 'a' || !result.added
+    if (!result.cursorMoved || !result.focus || result.keys !== 2 || result.text !== 'a' || !result.added
         || !result.completed || !result.locked || !result.unlocked || !result.parentRestored) {
+      result.clicks = await record.window.webContents.executeJavaScript('window.inputSmokeClicks');
       throw new Error('desktop input verification failed');
     }
     await finish();
