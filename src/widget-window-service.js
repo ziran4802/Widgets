@@ -82,6 +82,7 @@ class WidgetWindowService {
     this.temporaryHidden = false;
     this.temporarilyVisibleIds = new Set();
     this.noteFlushSequence = 0;
+    this.desktopInputRouter = undefined;
   }
 
   isAlive(window) {
@@ -121,6 +122,11 @@ class WidgetWindowService {
   }
 
   async applyHostInput(record) {
+    if (record.component.type === 'daily-todo' && this.isInteractive(record)
+        && typeof this.hostService?.adapter?.nativeHost?.startMouseRouter === 'function') {
+      this.startDesktopInputRouter();
+      if (!this.desktopInputRouter) throw new Error('desktop input router unavailable');
+    }
     // Electron can rewrite extended styles. Refresh and verify the native
     // WorkerW styles only after Electron has applied its mouse-ignore state.
     this.setWindowMouseEvents(record, this.isInteractive(record));
@@ -134,6 +140,7 @@ class WidgetWindowService {
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
     if (!record.window) throw new Error('widget window could not be created');
     this.windows.set(component.instanceId, record);
+    if (component.type === 'daily-todo') this.startDesktopInputRouter();
     const handleRenderProcessGone = (_event, details = {}) => {
       if (this.closing || record.suppressRecovery || !this.isAlive(record.window)) return;
       record.closeReason = `render process gone: ${typeof details.reason === 'string' ? details.reason : 'unknown'}`;
@@ -152,6 +159,10 @@ class WidgetWindowService {
         this.uninstallNativeDragHooks(record);
         if (this.windows.get(component.instanceId) === record) {
           this.windows.delete(component.instanceId);
+          if (component.type === 'daily-todo') {
+            this.desktopInputRouter?.stop();
+            this.desktopInputRouter = undefined;
+          }
           if (!this.closing && !record.suppressRecovery) {
             try { this.onWindowClosed(component.instanceId, clone(record.component), record.closeReason || 'window closed'); } catch {}
           }
@@ -184,6 +195,23 @@ class WidgetWindowService {
         record.window.hookWindowMessage(message, callback);
         record.nativeDragHooks.push(message);
       } catch {}
+    }
+  }
+
+  startDesktopInputRouter() {
+    const nativeHost = this.hostService?.adapter?.nativeHost;
+    if (this.desktopInputRouter || typeof nativeHost?.startMouseRouter !== 'function') return;
+    try {
+      this.desktopInputRouter = nativeHost.startMouseRouter(() => {
+        if (this.closing || this.temporaryHidden) return [];
+        return [...this.windows.values()].filter(record => record.component.type === 'daily-todo'
+          && record.component.visible && record.loaded && record.hostReady && record.hostMode === 'desktop'
+          && !record.editing && record.todoInteractive !== false && this.isAlive(record.window))
+          .map(record => ({ window: record.window, worker: this.hostService.records.get(record.component.instanceId)?.hostState?.nativeState?.worker }))
+          .filter(target => target.worker);
+      });
+    } catch {
+      this.onHostState('daily-todo', { phase: 'unavailable', lastResult: { errors: ['desktop input router unavailable'] } });
     }
   }
 
@@ -657,6 +685,8 @@ class WidgetWindowService {
 
   closeAll() {
     this.closing = true;
+    this.desktopInputRouter?.stop();
+    this.desktopInputRouter = undefined;
     for (const record of this.windows.values()) {
       if (this.hostService) {
         this.queueHost(record, async () => {

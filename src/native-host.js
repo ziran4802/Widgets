@@ -68,9 +68,34 @@ function loadNativeHostAdapter(options = {}) {
     const SetCapture = user32.func('uintptr_t SetCapture(uintptr_t window)');
     const ReleaseCapture = user32.func('bool ReleaseCapture()');
     const GetCapture = user32.func('uintptr_t GetCapture()');
+    const IsWindowEnabled = user32.func('bool IsWindowEnabled(uintptr_t window)');
+    const EnableWindow = user32.func('bool EnableWindow(uintptr_t window, bool enable)');
     const GetClassNameW = user32.func('int GetClassNameW(uintptr_t window, _Out_ wchar_t * className, int maxCount)');
     const GetLastError = kernel32.func('uint GetLastError()');
     const SetLastError = kernel32.func('void SetLastError(uint error)');
+    const inputHosts = new Map();
+
+    function releaseInputHost(state) {
+      const lease = inputHosts.get(state.worker);
+      if (!lease) return;
+      lease.children.delete(state.child);
+      if (lease.children.size) return;
+      EnableWindow(state.worker, lease.enabledBefore);
+      inputHosts.delete(state.worker);
+    }
+
+    function acquireInputHost(state) {
+      let lease = inputHosts.get(state.worker);
+      if (!lease) {
+        lease = { enabledBefore: IsWindowEnabled(state.worker), children: new Set() };
+        inputHosts.set(state.worker, lease);
+      }
+      lease.children.add(state.child);
+      // Windows 11's wallpaper WorkerW can be disabled. A child cannot take
+      // keyboard focus until this parent is enabled. Restore it on last release.
+      EnableWindow(state.worker, true);
+      return IsWindowEnabled(state.worker);
+    }
 
     function readRect(window) {
       const rect = Buffer.alloc(16);
@@ -207,12 +232,16 @@ function loadNativeHostAdapter(options = {}) {
       SetLastError(0);
       const refreshed = SetWindowPos(child, 0n, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
       const refreshError = refreshed ? 0 : Number(GetLastError());
+      const hostEnabled = mode !== 'editing' || (write.ok && refreshed && acquireInputHost({ ...state, child }));
+      if (mode !== 'editing') releaseInputHost({ ...state, child });
       const observation = observe(window, state, bounds, state.scaleFactor || 1, mode, 'input');
-      if (write.ok && refreshed && observation.structureValid) state.inputMode = mode;
+      if (mode === 'editing' && state.inputMode !== 'editing' && (!hostEnabled || !observation.structureValid)) releaseInputHost({ ...state, child });
+      if (write.ok && refreshed && hostEnabled && observation.structureValid) state.inputMode = mode;
       const errors = [];
       if (!write.ok) errors.push(`SetWindowLongPtr(exStyle) failed:${write.error}`);
       if (!refreshed) errors.push(`SetWindowPos(style refresh) failed:${refreshError}`);
-      return { ...observation, write, refreshed, refreshError, success: write.ok && refreshed && observation.structureValid, errors: [...errors, ...observation.errors] };
+      if (!hostEnabled) errors.push('WorkerW input host remains disabled');
+      return { ...observation, write, refreshed, refreshError, hostEnabled, success: write.ok && refreshed && hostEnabled && observation.structureValid, errors: [...errors, ...observation.errors] };
     }
 
     function setGeometry(window, state, bounds) {
@@ -257,6 +286,7 @@ function loadNativeHostAdapter(options = {}) {
 
     function restore(window, state = {}) {
       const child = hwndFromElectron(window, koffi);
+      releaseInputHost({ ...state, child });
       const errors = [];
       if (state.parentBefore !== undefined) SetParent(child, state.parentBefore);
       if (state.originalStyle !== undefined) setWindowLongPtrChecked(child, GWL_STYLE, state.originalStyle);
@@ -265,7 +295,8 @@ function loadNativeHostAdapter(options = {}) {
       return { nativeAvailable: true, operation: 'restore', success: errors.length === 0, parent: asBigInt(GetParent(child)), style: Number(GetWindowLongPtrW(child, GWL_STYLE)), exStyle: Number(GetWindowLongPtrW(child, GWL_EXSTYLE)), errors };
     }
 
-    return Object.freeze({ available: true, nativeAvailable: true, attach, observe, setInputMode, setGeometry, capturePointer, releasePointer, samplePoint, restore });
+    const startMouseRouter = getTargets => require('./desktop-input-router').startDesktopInputRouter({ koffi, getTargets });
+    return Object.freeze({ available: true, nativeAvailable: true, attach, observe, setInputMode, setGeometry, capturePointer, releasePointer, samplePoint, restore, startMouseRouter });
   } catch (error) {
     return createUnavailable(`native adapter initialization failed: ${error.message}`);
   }

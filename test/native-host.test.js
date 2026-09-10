@@ -4,11 +4,14 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 
-function fixture({ failWrite = false, retainNoActivate = false, zero = 0n } = {}) {
+function fixture({ failWrite = false, retainNoActivate = false, zero = 0n, enabledBefore = false } = {}) {
   let exStyle = 0x080000a0;
   let lastError = 0;
   let sampled;
+  let enabled = enabledBefore;
   const functions = {
+    IsWindowEnabled: () => enabled,
+    EnableWindow: (_h, value) => { enabled = value; },
     GetParent: () => 2n,
     GetAncestor: () => 2n,
     GetWindowLongPtrW: (_h, index) => index === -16 ? 0x40000000 : exStyle,
@@ -47,8 +50,40 @@ function fixture({ failWrite = false, retainNoActivate = false, zero = 0n } = {}
   assert.equal(host.available, true);
   const handle = Buffer.alloc(8); handle.writeBigUInt64LE(1n);
   return { host, window: { getNativeWindowHandle: () => handle }, state: { worker: 2n, scaleFactor: 1 },
-    bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'dip' }, sampled: () => sampled };
+    bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'dip' }, sampled: () => sampled, enabled: () => enabled };
 }
+
+test('enables the disabled WorkerW for input and restores it on lock or detach', () => {
+  const f = fixture();
+  f.host.setInputMode(f.window, f.state, 'editing', f.bounds);
+  assert.equal(f.enabled(), true);
+  f.host.setInputMode(f.window, f.state, 'locked', f.bounds);
+  assert.equal(f.enabled(), false);
+  f.host.setInputMode(f.window, f.state, 'editing', f.bounds);
+  f.host.restore(f.window, f.state);
+  assert.equal(f.enabled(), false);
+});
+
+test('keeps WorkerW enabled until the last input owner releases it', () => {
+  const f = fixture();
+  const handle = Buffer.alloc(8);
+  handle.writeBigUInt64LE(3n);
+  const other = { getNativeWindowHandle: () => handle };
+  const otherState = { ...f.state };
+  f.host.setInputMode(f.window, f.state, 'editing', f.bounds);
+  f.host.setInputMode(other, otherState, 'editing', f.bounds);
+  f.host.setInputMode(f.window, f.state, 'locked', f.bounds);
+  assert.equal(f.enabled(), true);
+  f.host.setInputMode(other, otherState, 'locked', f.bounds);
+  assert.equal(f.enabled(), false);
+});
+
+test('preserves an already enabled WorkerW after releasing input', () => {
+  const f = fixture({ enabledBefore: true });
+  f.host.setInputMode(f.window, f.state, 'editing', f.bounds);
+  f.host.restore(f.window, f.state);
+  assert.equal(f.enabled(), true);
+});
 
 test('native input rejects failed writes for numeric and bigint zero return values', () => {
   for (const zero of [0, 0n]) {

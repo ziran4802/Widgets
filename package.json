@@ -24,6 +24,7 @@
     "smoke:tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/tray-smoke.ps1",
     "smoke:note": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/note-smoke.ps1",
     "smoke:todo": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/todo-smoke.ps1",
+    "smoke:todo-desktop": "electron tools/todo-desktop-input-smoke.js",
     "smoke:codex-quota": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/codex-quota-smoke.ps1",
     "smoke:desktop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/desktop-smoke.ps1",
     "smoke:autostart": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/autostart-smoke.ps1",
@@ -38,6 +39,6 @@
     "electron": "43.2.0"
   },
   "dependencies": {
-    "koffi": "2.14.1"
+    "koffi": "2.15.2"
   }
 }
