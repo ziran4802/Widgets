@@ -31,11 +31,11 @@
           </header>
           <div class="divider"></div>
           <section class="catalog-section">
-            <div class="section-head"><div><p class="eyebrow">CATALOG</p><h2>组件目录</h2></div><span class="hint">每种类型一个实例</span></div>
+            <div class="section-head"><div><p class="eyebrow">CATALOG</p><h2>组件目录</h2></div><div class="section-tools"><span id="catalog-total" class="hint">共 0 种</span><div id="catalog-pagination" class="pagination" hidden><button id="catalog-prev" class="page-button" type="button" aria-label="上一页">‹</button><span id="catalog-page" class="page-label">1 / 1</span><button id="catalog-next" class="page-button" type="button" aria-label="下一页">›</button></div></div></div>
             <div id="catalog" class="catalog-grid"></div>
           </section>
           <section class="instances-section">
-            <div class="section-head"><div><p class="eyebrow">ON DESKTOP</p><h2>已添加组件</h2></div><span id="instance-count" class="count-badge">0</span></div>
+            <div class="section-head"><div><p class="eyebrow">ON DESKTOP</p><h2>已添加组件</h2></div><div class="section-tools"><span id="instance-count" class="count-badge">0</span><div id="component-pagination" class="pagination" hidden><button id="component-prev" class="page-button" type="button" aria-label="上一页">‹</button><span id="component-page" class="page-label">1 / 1</span><button id="component-next" class="page-button" type="button" aria-label="下一页">›</button></div></div></div>
             <div id="components" class="instance-list"></div>
           </section>
           <div class="info-banner"><span class="info-icon">i</span><span>进入编辑布局后，可拖动组件调整位置。取消布局不会影响已保存的便签文字。</span></div>
@@ -77,6 +77,7 @@
       </section>
     </section>
   </main>
+  <script src="manager-pagination.js"></script>
   <script src="manager-renderer.js"></script>
 </body>
 </html>
