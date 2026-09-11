@@ -13,6 +13,7 @@ let todoSaveTail = Promise.resolve();
 let todoItemSequence = 0;
 let todoEditor;
 let dragMode = 'electron-native';
+let todoInteractive = true;
 let dragPointerId;
 let dragPendingUpdate;
 let dragPendingTerminal;
@@ -36,6 +37,7 @@ function applyTheme(view) {
   if (component?.type === 'note') {
     classes.push(`note-size-${noteConfig.size || 'standard'}`, `note-background-${noteConfig.background || 'yellow'}`);
   }
+  if (component?.type === 'daily-todo' && !todoInteractive) classes.push('todo-locked');
   if (editing) classes.push('editing');
   view.className = classes.join(' ');
   document.documentElement.style.setProperty('--widget-opacity', String(theme.opacity));
@@ -397,13 +399,39 @@ function saveTodoState(items) {
   return operation;
 }
 
+async function toggleTodoInteraction(button) {
+  if (editing || typeof window.widget?.setTodoInteraction !== 'function') return;
+  button.disabled = true;
+  try {
+    const result = await window.widget.setTodoInteraction(!todoInteractive);
+    if (result?.ok !== true) return;
+    todoInteractive = result.interactive === true;
+    render();
+  } finally {
+    if (button.isConnected) button.disabled = false;
+  }
+}
+
 function renderDailyTodo(view) {
   stopTodoDateTimer();
   view.classList.add('daily-todo');
   const items = todoItemsForToday();
   const completed = items.filter(item => item.completed).length;
   const strip = node('div', undefined, 'todo-drag-strip');
-  strip.append(node('span', 'DAILY / TODO', 'todo-eyebrow'), node('span', '本地清单', 'todo-drag-hint'));
+  const stripActions = node('div', undefined, 'todo-strip-actions');
+  const interaction = node('button', todoInteractive ? '交互中' : '已锁定', 'todo-interaction-toggle');
+  interaction.type = 'button';
+  interaction.disabled = editing;
+  interaction.setAttribute('aria-pressed', String(todoInteractive));
+  interaction.setAttribute('aria-label', todoInteractive ? '锁定每日待办交互' : '解锁每日待办交互');
+  interaction.title = editing ? '编辑布局时由管理器接管' : (todoInteractive ? '点击锁定；锁定后可从系统托盘解锁' : '已锁定，请从系统托盘解锁');
+  interaction.addEventListener('click', event => {
+    event.preventDefault();
+    event.stopPropagation();
+    void toggleTodoInteraction(interaction);
+  });
+  stripActions.append(node('span', '本地清单', 'todo-drag-hint'), interaction);
+  strip.append(node('span', 'DAILY / TODO', 'todo-eyebrow'), stripActions);
   const header = node('header', undefined, 'todo-header');
   const titleCopy = node('div');
   titleCopy.append(node('h1', '每日待办', 'todo-title'), node('span', todoDateLabel(), 'todo-date'));
@@ -440,7 +468,11 @@ function renderDailyTodo(view) {
   add.addEventListener('submit', event => {
     event.preventDefault();
     const title = input.value.trim();
-    if (!title || todoItemsForToday().length >= 64) return;
+    if (!title) {
+      input.focus();
+      return;
+    }
+    if (todoItemsForToday().length >= 64) return;
     const next = [...todoItemsForToday(), { id: `todo-${Date.now()}-${++todoItemSequence}`, title, completed: false }];
     input.value = '';
     localTodoState(next);
@@ -548,6 +580,7 @@ window.widget.onCodexQuota(next => { quota = next; if (component?.type === 'code
 window.widget.onEditMode(next => {
   editing = next?.editing === true;
   dragMode = next?.dragMode || 'electron-native';
+  if (typeof next?.interactive === 'boolean') todoInteractive = next.interactive;
   if (noteEditor?.view?.isConnected) applyTheme(noteEditor.view);
   else render();
 });

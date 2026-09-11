@@ -82,6 +82,7 @@ class WidgetWindowService {
     this.temporaryHidden = false;
     this.temporarilyVisibleIds = new Set();
     this.noteFlushSequence = 0;
+    this.desktopInputRouter = undefined;
   }
 
   isAlive(window) {
@@ -101,22 +102,45 @@ class WidgetWindowService {
   }
 
   editModePayload(record) {
-    return { editing: record.editing, dragMode: record.hostMode === 'desktop' ? 'native-message' : 'electron-native' };
+    return {
+      editing: record.editing,
+      dragMode: record.hostMode === 'desktop' ? 'native-message' : 'electron-native',
+      interactive: record.component.type === 'daily-todo' ? record.todoInteractive !== false : true
+    };
   }
 
   isInteractive(record) {
-    return Boolean(record?.editing || record?.component?.type === 'daily-todo');
+    return Boolean(record?.editing || (record?.component?.type === 'daily-todo' && record.todoInteractive !== false));
   }
 
   inputMode(record) {
     return this.isInteractive(record) ? 'editing' : 'locked';
   }
 
+  hostInputSucceeded(state) {
+    return ['ready', 'editing'].includes(state?.phase) && state?.lastResult?.success !== false;
+  }
+
+  async applyHostInput(record) {
+    if (record.component.type === 'daily-todo' && this.isInteractive(record)
+        && typeof this.hostService?.adapter?.nativeHost?.startMouseRouter === 'function') {
+      this.startDesktopInputRouter();
+      if (!this.desktopInputRouter) throw new Error('desktop input router unavailable');
+    }
+    // Electron can rewrite extended styles. Refresh and verify the native
+    // WorkerW styles only after Electron has applied its mouse-ignore state.
+    this.setWindowMouseEvents(record, this.isInteractive(record));
+    const state = await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
+    if (!this.hostInputSucceeded(state)) throw new Error('host input mode was not applied');
+    return state;
+  }
+
   createRecord(component) {
-    const record = { component: clone(component), loaded: false, window: undefined, editing: false, moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
+    const record = { component: clone(component), loaded: false, window: undefined, editing: false, todoInteractive: component.type === 'daily-todo', moveSequence: 0, drag: undefined, nativeDrag: false, nativeDragTask: Promise.resolve(), nativeDragHooks: [], noteFlushes: new Map(), hostMode: this.hostService ? 'desktop' : 'floating', hostReady: !this.hostService, hostPhase: this.hostService ? 'creating' : 'floating', hostTask: Promise.resolve() };
     record.window = this.createWindow(buildWidgetWindowOptions(component, this.preloadPath));
     if (!record.window) throw new Error('widget window could not be created');
     this.windows.set(component.instanceId, record);
+    if (component.type === 'daily-todo') this.startDesktopInputRouter();
     const handleRenderProcessGone = (_event, details = {}) => {
       if (this.closing || record.suppressRecovery || !this.isAlive(record.window)) return;
       record.closeReason = `render process gone: ${typeof details.reason === 'string' ? details.reason : 'unknown'}`;
@@ -135,6 +159,10 @@ class WidgetWindowService {
         this.uninstallNativeDragHooks(record);
         if (this.windows.get(component.instanceId) === record) {
           this.windows.delete(component.instanceId);
+          if (component.type === 'daily-todo') {
+            this.desktopInputRouter?.stop();
+            this.desktopInputRouter = undefined;
+          }
           if (!this.closing && !record.suppressRecovery) {
             try { this.onWindowClosed(component.instanceId, clone(record.component), record.closeReason || 'window closed'); } catch {}
           }
@@ -167,6 +195,23 @@ class WidgetWindowService {
         record.window.hookWindowMessage(message, callback);
         record.nativeDragHooks.push(message);
       } catch {}
+    }
+  }
+
+  startDesktopInputRouter() {
+    const nativeHost = this.hostService?.adapter?.nativeHost;
+    if (this.desktopInputRouter || typeof nativeHost?.startMouseRouter !== 'function') return;
+    try {
+      this.desktopInputRouter = nativeHost.startMouseRouter(() => {
+        if (this.closing || this.temporaryHidden) return [];
+        return [...this.windows.values()].filter(record => record.component.type === 'daily-todo'
+          && record.component.visible && record.loaded && record.hostReady && record.hostMode === 'desktop'
+          && !record.editing && record.todoInteractive !== false && this.isAlive(record.window))
+          .map(record => ({ window: record.window, worker: this.hostService.records.get(record.component.instanceId)?.hostState?.nativeState?.worker }))
+          .filter(target => target.worker);
+      });
+    } catch {
+      this.onHostState('daily-todo', { phase: 'unavailable', lastResult: { errors: ['desktop input router unavailable'] } });
     }
   }
 
@@ -280,9 +325,7 @@ class WidgetWindowService {
           await new Promise(resolve => setTimeout(resolve, 400));
         }
         if (record.hostReady) {
-          const interactive = this.isInteractive(record);
-          await this.hostService.setInputMode(record.component.instanceId, this.inputMode(record));
-          this.setWindowMouseEvents(record, interactive);
+          await this.applyHostInput(record);
           if (!this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
         } else if (this.isAlive(record.window) && typeof record.window.hide === 'function') {
           record.window.hide();
@@ -458,6 +501,50 @@ class WidgetWindowService {
     }
   }
 
+  async setTodoInteraction(instanceId, interactive) {
+    const record = this.windows.get(instanceId);
+    if (!record || record.component.type !== 'daily-todo' || typeof interactive !== 'boolean') return { ok: false, errorCode: 'INVALID_TODO_INTERACTION' };
+    const previous = record.todoInteractive !== false;
+    const next = interactive;
+    record.todoInteractive = next;
+    const apply = async () => {
+      if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
+        const state = await this.applyHostInput(record);
+        record.hostPhase = state?.phase || record.hostPhase;
+        record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
+        this.notifyHostState(record, state);
+      } else {
+        this.setWindowMouseEvents(record, this.isInteractive(record));
+      }
+      this.send(record, 'widget:edit-mode', this.editModePayload(record));
+    };
+    try {
+      if (this.hostService && record.hostMode === 'desktop' && record.hostReady) await this.queueHost(record, apply);
+      else await apply();
+      return { ok: true, interactive: next };
+    } catch {
+      record.todoInteractive = previous;
+      try {
+        if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
+          await this.queueHost(record, async () => {
+            const state = await this.applyHostInput(record);
+            record.hostPhase = state?.phase || record.hostPhase;
+            record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
+            this.notifyHostState(record, state);
+          });
+        } else {
+          this.setWindowMouseEvents(record, this.isInteractive(record));
+        }
+      } catch {
+        record.hostReady = false;
+        record.hostPhase = 'unavailable';
+        if (this.isAlive(record.window)) record.window.hide?.();
+      }
+      this.send(record, 'widget:edit-mode', this.editModePayload(record));
+      return { ok: false, errorCode: 'TODO_INTERACTION_FAILED' };
+    }
+  }
+
   setEditMode(instanceId, editing) {
     const record = this.windows.get(instanceId);
     if (!record) return false;
@@ -483,12 +570,11 @@ class WidgetWindowService {
           if (this.isAlive(record.window) && typeof record.window.hide === 'function') record.window.hide();
           return;
         }
-        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        const state = await this.applyHostInput(record);
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         record.hostMode = record.hostReady ? 'desktop' : 'floating';
         this.notifyHostState(record, state);
-        this.setWindowMouseEvents(record, this.isInteractive(record));
         this.send(record, 'widget:edit-mode', this.editModePayload(record));
         if (record.hostReady && !this.temporaryHidden && record.component.visible && record.loaded && this.isAlive(record.window) && typeof record.window.show === 'function') record.window.show();
       }).catch(error => {
@@ -522,15 +608,10 @@ class WidgetWindowService {
     this.send(record, 'widget:edit-mode', this.editModePayload(record));
     if (this.hostService && record.hostMode === 'desktop' && record.hostReady) {
       this.queueHost(record, async () => {
-        const interactive = this.isInteractive(record);
-        const state = await this.hostService.setInputMode(instanceId, this.inputMode(record));
+        const state = await this.applyHostInput(record);
         record.hostPhase = state?.phase || record.hostPhase;
         record.hostReady = ['ready', 'editing'].includes(record.hostPhase);
         this.notifyHostState(record, state);
-        // Electron's mouse-ignore flag must be applied after the native
-        // WS_EX_* transition, otherwise the two APIs can restore opposing
-        // input styles on a reparented WorkerW child.
-        this.setWindowMouseEvents(record, interactive);
       }).catch(() => {});
     }
     return true;
@@ -604,6 +685,8 @@ class WidgetWindowService {
 
   closeAll() {
     this.closing = true;
+    this.desktopInputRouter?.stop();
+    this.desktopInputRouter = undefined;
     for (const record of this.windows.values()) {
       if (this.hostService) {
         this.queueHost(record, async () => {

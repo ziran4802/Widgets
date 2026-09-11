@@ -79,6 +79,11 @@ h1 { font-size: 20px; letter-spacing: -.03em; }
 .todo-drag-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 34px; padding: 8px 15px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.05); -webkit-app-region: no-drag; cursor: default; user-select: none; }
 .daily-todo.editing .todo-drag-strip { -webkit-app-region: drag; cursor: move; }
 .daily-todo.native-drag.editing .todo-drag-strip { -webkit-app-region: no-drag; }
+.todo-strip-actions { display: flex; align-items: center; gap: 8px; min-width: 0; -webkit-app-region: no-drag; }
+.todo-interaction-toggle { flex: 0 0 auto; padding: 4px 8px; border: 1px solid rgba(114,178,255,.42); border-radius: 7px; color: var(--accent); background: rgba(114,178,255,.1); font: inherit; font-size: 10px; cursor: pointer; -webkit-app-region: no-drag; }
+.todo-interaction-toggle:hover, .todo-interaction-toggle:focus-visible { background: rgba(114,178,255,.2); outline: none; }
+.todo-interaction-toggle[aria-pressed="false"] { border-color: var(--line); color: var(--muted); background: rgba(255,255,255,.06); }
+.todo-interaction-toggle:disabled { cursor: default; opacity: .62; }
 .todo-eyebrow { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
 .todo-drag-hint { color: var(--muted); font-size: 10px; }
 .todo-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 0 18px; }

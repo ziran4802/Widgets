@@ -31,14 +31,13 @@
           </header>
           <div class="divider"></div>
           <section class="catalog-section">
-            <div class="section-head"><div><p class="eyebrow">CATALOG</p><h2>组件目录</h2></div><span class="hint">每种类型一个实例</span></div>
+            <div class="section-head"><div><p class="eyebrow">CATALOG</p><h2>组件目录</h2></div><div class="section-tools"><span id="catalog-total" class="hint">共 0 种</span><div id="catalog-pagination" class="pagination" hidden><button id="catalog-prev" class="page-button" type="button" aria-label="上一页">‹</button><span id="catalog-page" class="page-label">1 / 1</span><button id="catalog-next" class="page-button" type="button" aria-label="下一页">›</button></div></div></div>
             <div id="catalog" class="catalog-grid"></div>
           </section>
           <section class="instances-section">
-            <div class="section-head"><div><p class="eyebrow">ON DESKTOP</p><h2>已添加组件</h2></div><span id="instance-count" class="count-badge">0</span></div>
+            <div class="section-head"><div><p class="eyebrow">ON DESKTOP</p><h2>已添加组件</h2></div><div class="section-tools"><span id="instance-count" class="count-badge">0</span><div id="component-pagination" class="pagination" hidden><button id="component-prev" class="page-button" type="button" aria-label="上一页">‹</button><span id="component-page" class="page-label">1 / 1</span><button id="component-next" class="page-button" type="button" aria-label="下一页">›</button></div></div></div>
             <div id="components" class="instance-list"></div>
           </section>
-          <div class="info-banner"><span class="info-icon">i</span><span>进入编辑布局后，可拖动组件调整位置。取消布局不会影响已保存的便签文字。</span></div>
         </section>
         <section id="page-appearance" class="page" hidden>
           <header class="page-head"><div><p class="eyebrow">APPEARANCE</p><h1>外观</h1><p class="subtitle">调整所有组件的默认显示风格</p></div></header>
@@ -73,10 +72,11 @@
           <div class="section-head"><div><p class="eyebrow">EDIT SESSION</p><h2>编辑布局</h2></div><div class="editor-state"><span class="preview-badge">LIVE PREVIEW</span><span class="hint">完成才会保存，取消不写盘</span></div></div>
           <div id="editor-content"></div>
         </section>
-        <footer><span id="source">配置来源：—</span><span>Widget · 概念预览与真实数据</span></footer>
+        <footer><span id="source">配置来源：—</span><span class="footer-note">编辑布局可调整位置，便签内容独立保存。</span><span>Widget · 概念预览与真实数据</span></footer>
       </section>
     </section>
   </main>
+  <script src="manager-pagination.js"></script>
   <script src="manager-renderer.js"></script>
 </body>
 </html>

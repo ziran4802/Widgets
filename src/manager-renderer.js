@@ -2,11 +2,21 @@ const statusView = document.querySelector('#status');
 const errorView = document.querySelector('#error');
 const catalogView = document.querySelector('#catalog');
 const componentsView = document.querySelector('#components');
+const contentView = document.querySelector('.content');
 const editorView = document.querySelector('#editor');
 const editorContent = document.querySelector('#editor-content');
 const revisionView = document.querySelector('#revision');
 const sourceView = document.querySelector('#source');
 const instanceCountView = document.querySelector('#instance-count');
+const catalogTotalView = document.querySelector('#catalog-total');
+const catalogPaginationView = document.querySelector('#catalog-pagination');
+const catalogPreviousButton = document.querySelector('#catalog-prev');
+const catalogPageView = document.querySelector('#catalog-page');
+const catalogNextButton = document.querySelector('#catalog-next');
+const componentPaginationView = document.querySelector('#component-pagination');
+const componentPreviousButton = document.querySelector('#component-prev');
+const componentPageView = document.querySelector('#component-page');
+const componentNextButton = document.querySelector('#component-next');
 const editLayoutButton = document.querySelector('#edit-layout');
 const pages = new Map([
   ['components', document.querySelector('#page-components')],
@@ -28,10 +38,15 @@ let requestSequence = 0;
 let snapshot;
 let activeEdit;
 let currentView = 'components';
+let catalogPage = 0;
+let componentPage = 0;
 let editorBoundsInputs = new Map();
 let editUpdateTail = Promise.resolve();
 let autostartState;
 let autostartBusy = false;
+let resizeTimer;
+
+const pagination = window.managerPagination;
 
 const COMPONENT_DETAILS = Object.freeze({
   'system-monitor': Object.freeze({ icon: 'CPU', description: '实时查看处理器、内存和指标状态' }),
@@ -61,7 +76,34 @@ function button(text, className, handler) {
 
 function showError(message) {
   errorView.textContent = message;
+  errorView.title = message || '';
   errorView.hidden = !message;
+}
+
+function pageSizes() {
+  const narrow = window.innerWidth < 920;
+  return {
+    catalog: narrow ? 2 : 3,
+    components: narrow || window.innerHeight < 700 ? 3 : 5
+  };
+}
+
+function updatePagination(view, previousButton, pageView, nextButton, page) {
+  if (!view || !previousButton || !pageView || !nextButton) return;
+  view.hidden = page.pageCount <= 1;
+  pageView.textContent = `${page.currentPage + 1} / ${page.pageCount}`;
+  previousButton.disabled = !page.hasPrevious;
+  nextButton.disabled = !page.hasNext;
+}
+
+function paginate(items, pageSize, currentPage) {
+  if (!pagination?.createPageModel) throw new Error('分页模块加载失败');
+  return pagination.createPageModel(items, pageSize, currentPage);
+}
+
+function setTextTitle(element, text) {
+  if (text !== undefined && text !== null) element.title = String(text);
+  return element;
 }
 
 function catalogPreview(type) {
@@ -120,16 +162,20 @@ function renderHeader() {
 function renderCatalog() {
   catalogView.replaceChildren();
   const items = snapshot?.catalog?.catalog || [];
+  const page = paginate(items, pageSizes().catalog, catalogPage);
+  catalogPage = page.currentPage;
+  if (catalogTotalView) catalogTotalView.textContent = `共 ${items.length} 种`;
+  updatePagination(catalogPaginationView, catalogPreviousButton, catalogPageView, catalogNextButton, page);
   if (items.length === 0) { catalogView.append(node('div', '暂无可用组件', 'empty')); return; }
-  for (const item of items) {
+  for (const item of page.items) {
     const detail = COMPONENT_DETAILS[item.type] || { icon: 'W', description: '桌面信息组件' };
     const card = node('article', undefined, 'card catalog-card');
     card.append(catalogPreview(item.type));
     const row = node('div', undefined, 'card-head');
     row.append(node('div', detail.icon, `component-icon ${item.type}`));
     const info = node('div');
-    info.append(node('div', item.displayName, 'title'));
-    info.append(node('div', detail.description, 'meta'));
+    info.append(setTextTitle(node('div', item.displayName, 'title'), item.displayName));
+    info.append(setTextTitle(node('div', detail.description, 'meta'), detail.description));
     row.append(info);
     const foot = node('div', undefined, 'card-foot');
     foot.append(node('span', item.available ? '可添加' : '已添加', `state ${item.available ? 'available' : 'added'}`));
@@ -143,39 +189,47 @@ function renderCatalog() {
 function renderComponents() {
   componentsView.replaceChildren();
   const components = snapshot?.catalog?.components || [];
+  const page = paginate(components, pageSizes().components, componentPage);
+  componentPage = page.currentPage;
   if (instanceCountView) instanceCountView.textContent = String(components.length);
+  updatePagination(componentPaginationView, componentPreviousButton, componentPageView, componentNextButton, page);
   if (components.length === 0) { componentsView.append(node('div', '还没有添加组件，从左侧目录开始。', 'empty')); return; }
-  for (const component of components) {
+  for (const component of page.items) {
     const detail = COMPONENT_DETAILS[component.type] || { icon: 'W', description: '桌面信息组件' };
     const card = node('article', undefined, 'card instance-card');
     const row = node('div', undefined, 'card-head');
     row.append(node('div', detail.icon, `component-icon ${component.type}`));
     const info = node('div');
-    const titleRow = node('div', undefined, 'title-row');
-    titleRow.append(node('div', component.displayName, 'title'));
-    titleRow.append(node('span', component.visible ? '显示中' : '已隐藏', `state ${component.visible ? 'visible' : 'hidden'}`));
-    info.append(titleRow);
-    info.append(node('div', detail.description, 'meta'));
+    info.append(setTextTitle(node('div', component.displayName, 'title'), component.displayName));
     row.append(info);
-    const summary = node('div', undefined, 'instance-summary');
-    summary.append(node('span', `位置 ${component.bounds.x}, ${component.bounds.y} DIP`));
-    summary.append(node('span', `${component.bounds.width} × ${component.bounds.height} DIP`));
+    const status = node('div', undefined, 'instance-status');
+    status.append(setTextTitle(node('div', detail.description, 'meta'), detail.description));
+    status.append(node('span', component.visible ? '显示中' : '已隐藏', `state ${component.visible ? 'visible' : 'hidden'}`));
     const actions = node('div', undefined, 'actions card-actions');
-    actions.append(button(component.visible ? '隐藏' : '显示', 'secondary', () => toggleVisible(component)));
-    actions.append(button('编辑', 'secondary', () => beginEdit(component)));
-    actions.append(button('删除', 'danger', () => removeComponent(component.instanceId)));
+    actions.append(button('⚙ 设置', 'secondary', () => beginEdit(component)));
+    actions.append(button(component.visible ? '◉ 隐藏' : '◌ 显示', 'secondary', () => toggleVisible(component)));
+    const more = node('details', undefined, 'more-actions');
+    const moreTrigger = node('summary', '⋯', 'more-trigger');
+    moreTrigger.title = '更多操作';
+    moreTrigger.setAttribute('aria-label', `${component.displayName} 更多操作`);
+    const moreMenu = node('div', undefined, 'more-menu');
+    moreMenu.append(button('删除', 'danger', () => removeComponent(component.instanceId)));
+    more.append(moreTrigger, moreMenu);
     card.append(row);
-    card.append(summary);
+    card.append(status);
     card.append(actions);
+    actions.append(more);
     componentsView.append(card);
   }
 }
 
 function renderEditor() {
-  editorView.hidden = !activeEdit || currentView !== 'components';
+  const editorVisible = Boolean(activeEdit && currentView === 'components');
+  editorView.hidden = !editorVisible;
+  contentView?.classList.toggle('editor-open', editorVisible);
   editorContent.replaceChildren();
   editorBoundsInputs = new Map();
-  if (!activeEdit) return;
+  if (!editorVisible) return;
   const component = activeEdit.workingCopy;
   const form = node('div');
   const grid = node('div', undefined, 'form-grid');
@@ -317,7 +371,9 @@ function renderAutostart(state = autostartState) {
   if (autostartDetail) {
     const message = state?.message || '无法读取 Windows 当前用户启动状态';
     const effective = state?.effective?.enabled ? 'Windows 报告当前启动项可生效' : 'Windows 报告当前启动项未生效';
-    autostartDetail.textContent = `${message}；${effective}。${formatAutostartPath(state)}`;
+    const detail = `${message}；${effective}。${formatAutostartPath(state)}`;
+    autostartDetail.textContent = detail;
+    autostartDetail.title = detail;
   }
   if (autostartRepair) autostartRepair.hidden = status !== 'path-mismatch';
   if (autostartRetry) autostartRetry.disabled = autostartBusy;
@@ -443,7 +499,6 @@ async function beginEdit(component) {
     activeEdit = { sessionId: response.edit.sessionId, workingCopy: response.edit.workingCopy };
     editUpdateTail = Promise.resolve();
     renderEditor();
-    editorView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (error) { showError(error.message); }
 }
 
@@ -465,6 +520,16 @@ async function cancelEdit() {
 }
 
 document.querySelector('#refresh').addEventListener('click', refresh);
+catalogPreviousButton?.addEventListener('click', () => { catalogPage -= 1; renderCatalog(); });
+catalogNextButton?.addEventListener('click', () => { catalogPage += 1; renderCatalog(); });
+componentPreviousButton?.addEventListener('click', () => { componentPage -= 1; renderComponents(); });
+componentNextButton?.addEventListener('click', () => { componentPage += 1; renderComponents(); });
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!activeEdit) { renderCatalog(); renderComponents(); }
+  }, 80);
+});
 for (const item of navItems) item.addEventListener('click', () => setView(item.dataset.view));
 editLayoutButton?.addEventListener('click', beginLayoutEdit);
 globalTheme?.addEventListener('change', () => updateSettings({ theme: globalTheme.value }));
