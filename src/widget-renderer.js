@@ -177,10 +177,19 @@ function quotaUpdatedAt(value) {
 }
 
 function quotaStatus(quota) {
-  if (quota?.phase === 'available') return '已同步';
-  if (quota?.phase === 'loading') return '读取中';
-  if (quota?.phase === 'idle') return '等待读取';
+  if (quota?.phase === 'available') return quota.cacheState === 'cached' ? '上次结果' : '已确认';
+  if (quota?.phase === 'loading') return '确认中';
+  if (quota?.phase === 'stale') return '确认失败，显示上次结果';
+  if (quota?.phase === 'idle') return '尚未确认';
   return '不可用';
+}
+
+function quotaFeedback(quota) {
+  if (quota?.phase === 'loading') return '正在读取…';
+  if (quota?.phase === 'stale') return '读取失败，保留上次结果';
+  if (quota?.phase === 'available') return quota.cacheState === 'cached' ? '上次结果' : '已更新';
+  if (quota?.phase === 'idle') return '待确认';
+  return '读取失败';
 }
 
 function renderQuotaSummary(label, value, className = '') {
@@ -193,19 +202,26 @@ function renderCodexQuota(view) {
   stopQuotaTimer();
   view.classList.add('codex-quota');
   const current = quota || { phase: 'idle', fiveHour: null, weekly: null, updatedAt: null };
+  const hasData = Boolean(current.fiveHour || current.weekly);
+  const loading = current.phase === 'loading';
   const header = node('header', undefined, 'quota-header');
   header.append(node('h1', 'Codex 额度', 'quota-title'));
   const badges = node('div', undefined, 'quota-badges');
-  const refresh = node('button', '本地读取', 'quota-read');
+  const refresh = node('button', loading ? '确认中…' : hasData ? '重新确认' : '确认额度', 'quota-read');
   refresh.type = 'button';
-  refresh.addEventListener('click', async () => {
-    refresh.disabled = true;
-    try { await window.widget.refreshCodexQuota?.(); } finally { refresh.disabled = false; }
+  refresh.disabled = loading;
+  refresh.title = hasData ? '点击重新确认最新 Codex 额度' : '点击确认当前 Codex 额度';
+  refresh.addEventListener('click', () => {
+    if (!refresh.disabled) void window.widget.refreshCodexQuota?.();
   });
   badges.append(refresh);
   badges.append(node('span', quotaStatus(current), `quota-status ${current.phase || 'unavailable'}`));
   header.append(badges);
   view.append(header);
+  const feedback = node('span', quotaFeedback(current), `quota-feedback ${current.phase || 'unavailable'}`);
+  feedback.setAttribute('role', 'status');
+  feedback.setAttribute('aria-live', 'polite');
+  view.append(feedback);
 
   const body = node('div', undefined, 'quota-body');
   const primary = node('section', undefined, 'quota-primary');
@@ -233,7 +249,7 @@ function renderCodexQuota(view) {
   side.append(weekly, summary);
   body.append(primary, side);
   view.append(body);
-  if (current.phase === 'unavailable') view.append(node('small', current.message || '暂时无法读取 Codex 额度', 'quota-message'));
+  if (current.phase === 'unavailable' || current.phase === 'stale') view.append(node('small', current.message || '暂时无法确认 Codex 额度', `quota-message ${current.phase}`));
   if (current.phase === 'available' && Number.isFinite(current.fiveHour?.resetsAt)) quotaTimer = window.setInterval(() => {
     const reset = view.querySelector('.quota-reset .quota-summary-value');
     if (reset) reset.textContent = quotaCountdown(current.fiveHour.resetsAt);

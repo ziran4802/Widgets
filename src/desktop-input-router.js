@@ -4,8 +4,8 @@ const UP = 0x0202;
 const WHEEL = 0x020a;
 let callbackType;
 
-// Only an active desktop todo can receive forwarded input. A click which
-// started in another application must never finish inside this widget.
+// Only an active desktop-interactive widget can receive forwarded input. A
+// click which started in another application must never finish inside it.
 function createInputRoute({ getTargets, inspect, deliver }) {
   let pressed;
   return (message, point, mouseData = 0) => {

@@ -335,6 +335,54 @@ test('keeps the daily todo widget interactive while attached to WorkerW', async 
   assert.deepEqual(window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
 });
 
+test('keeps the Codex quota widget clickable while attached to WorkerW', async () => {
+  const calls = [];
+  let getTargets;
+  const hostService = {
+    records: new Map(),
+    adapter: {
+      registerWindow() {},
+      nativeHost: {
+        startMouseRouter(callback) {
+          getTargets = callback;
+          return { stop() {} };
+        }
+      }
+    },
+    async create(component) {
+      this.records.set(component.instanceId, { hostState: { nativeState: { worker: 123n } } });
+      calls.push(['create', component.instanceId]);
+      return { phase: 'created' };
+    },
+    async attach(instanceId) { calls.push(['attach', instanceId]); return { phase: 'ready', instanceId, mode: 'locked' }; },
+    async setInputMode(instanceId, mode) {
+      assert.equal(created[0].ignoreMouseEvents?.ignore, false);
+      calls.push(['input', instanceId, mode]);
+      return { phase: mode === 'editing' ? 'editing' : 'ready', instanceId, mode };
+    },
+    async setGeometry() { return { phase: 'ready' }; },
+    async destroy() { return { ok: true }; }
+  };
+  const created = [];
+  const service = new WidgetWindowService({
+    createWindow: options => { const window = new FakeWindow(options); created.push(window); return window; },
+    preloadPath: 'widget-preload.js',
+    pagePath: 'widget.html',
+    hostService
+  });
+  const quota = component({ instanceId: 'codex-quota-1', type: 'codex-quota', displayName: 'Codex 额度' });
+  service.sync(snapshot([quota]));
+  const record = [...service.windows.values()][0];
+  await record.hostTask;
+  record.window.webContents.emit('did-finish-load');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(calls.at(-1), ['input', 'codex-quota-1', 'editing']);
+  assert.deepEqual(record.window.ignoreMouseEvents, { ignore: false, options: { forward: false } });
+  assert.equal(getTargets().length, 1);
+  assert.equal(getTargets()[0].window, record.window);
+});
+
 test('toggles daily todo desktop interaction without changing its component config', async () => {
   const calls = [];
   const hostService = {
