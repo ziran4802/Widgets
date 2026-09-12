@@ -5,6 +5,8 @@ const path = require('node:path');
 
 const DEFAULT_REFRESH_MS = 60 * 1000;
 const DEFAULT_TIMEOUT_MS = 8000;
+const CACHE_SCHEMA_VERSION = 1;
+const DEFAULT_CACHE_FILENAME = 'codex-quota-cache.json';
 const FIVE_HOUR_MINUTES = 5 * 60;
 const WEEK_MINUTES = 7 * 24 * 60;
 
@@ -127,6 +129,37 @@ function unavailableQuota(message = '暂时无法读取 Codex 额度', code = 'C
   };
 }
 
+function normalizeCachedQuota(value) {
+  if (!isObject(value) || value.schemaVersion !== CACHE_SCHEMA_VERSION) return undefined;
+  if (typeof value.updatedAt !== 'string' || !Number.isFinite(Date.parse(value.updatedAt))) return undefined;
+  const fiveHour = normalizeWindow(value.fiveHour, FIVE_HOUR_MINUTES);
+  const weekly = normalizeWindow(value.weekly, WEEK_MINUTES);
+  if (!fiveHour && !weekly) return undefined;
+  return {
+    schemaVersion: 1,
+    phase: 'available',
+    source: 'local-cache',
+    cacheState: 'cached',
+    updatedAt: value.updatedAt,
+    message: '上次确认',
+    fiveHour,
+    weekly
+  };
+}
+
+function quotaCachePayload(snapshot) {
+  return {
+    schemaVersion: CACHE_SCHEMA_VERSION,
+    updatedAt: snapshot.updatedAt,
+    fiveHour: snapshot.fiveHour,
+    weekly: snapshot.weekly
+  };
+}
+
+function hasQuotaData(snapshot) {
+  return Boolean(snapshot?.fiveHour || snapshot?.weekly);
+}
+
 function readAppServerQuota({ spawnProcess = spawn, executable = resolveCodexExecutable(), timeoutMs = DEFAULT_TIMEOUT_MS, onProcess } = {}) {
   return new Promise((resolve, reject) => {
     let child;
@@ -211,7 +244,7 @@ function errorMessage(error) {
 }
 
 class CodexQuotaService extends EventEmitter {
-  constructor({ intervalMs = DEFAULT_REFRESH_MS, timeoutMs = DEFAULT_TIMEOUT_MS, executable, spawnProcess, fixture, now = () => new Date() } = {}) {
+  constructor({ intervalMs = DEFAULT_REFRESH_MS, timeoutMs = DEFAULT_TIMEOUT_MS, executable, spawnProcess, fixture, now = () => new Date(), cachePath } = {}) {
     super();
     if (!Number.isInteger(intervalMs) || intervalMs < 1000) throw new TypeError('intervalMs must be at least 1000ms');
     if (!Number.isInteger(timeoutMs) || timeoutMs < 500) throw new TypeError('timeoutMs must be at least 500ms');
@@ -221,7 +254,10 @@ class CodexQuotaService extends EventEmitter {
     this.spawnProcess = spawnProcess || spawn;
     this.fixture = fixture;
     this.now = now;
+    this.cachePath = typeof cachePath === 'string' && cachePath.trim() ? path.resolve(cachePath) : undefined;
+    this.cacheTempPath = this.cachePath ? `${this.cachePath}.tmp` : undefined;
     this.timer = undefined;
+    this.started = false;
     this.pending = false;
     this.activeProcess = undefined;
     this.current = { ...unavailableQuota('等待读取', 'CODEX_QUOTA_IDLE'), phase: 'idle' };
@@ -231,31 +267,41 @@ class CodexQuotaService extends EventEmitter {
     return clone(this.current);
   }
 
-  start() {
-    if (this.timer) return this.snapshot();
-    void this.refresh();
-    this.timer = setInterval(() => { void this.refresh(); }, this.intervalMs);
+  async start() {
+    if (this.started) return this.snapshot();
+    this.started = true;
+    const cached = await this.readCache();
+    if (cached) {
+      this.current = cached;
+      this.emit('update', this.snapshot());
+    }
     return this.snapshot();
   }
 
   async refresh() {
     if (this.pending) return this.snapshot();
     this.pending = true;
-    this.current = { ...this.current, phase: 'loading', message: '正在读取' };
+    const previous = this.current;
+    this.current = { ...previous, phase: 'loading', message: '正在确认', errorCode: undefined };
     this.emit('update', this.snapshot());
     try {
       const result = this.fixture === undefined
         ? await readAppServerQuota({ executable: this.executable, spawnProcess: this.spawnProcess, timeoutMs: this.timeoutMs, onProcess: process => { this.activeProcess = process; } })
         : normalizeRateLimitsResponse({ result: { rateLimits: this.fixture } }, this.now());
-      if (this.timer || this.fixture !== undefined) {
-        this.current = result;
+      this.current = { ...result, cacheState: 'fresh' };
+      try {
+        await this.writeCache(this.current);
+      } catch {}
+      if (this.started || this.fixture !== undefined) {
         this.emit('update', this.snapshot());
       }
-      return result;
+      return this.snapshot();
     } catch (error) {
       const [message, code] = errorMessage(error);
-      this.current = unavailableQuota(message, code);
-      if (this.timer || this.fixture !== undefined) this.emit('update', this.snapshot());
+      this.current = hasQuotaData(previous)
+        ? { ...previous, phase: 'stale', cacheState: 'stale', message: `${message}，显示上次结果`, errorCode: code }
+        : unavailableQuota(message, code);
+      if (this.started || this.fixture !== undefined) this.emit('update', this.snapshot());
       return this.snapshot();
     } finally {
       this.pending = false;
@@ -263,9 +309,35 @@ class CodexQuotaService extends EventEmitter {
     }
   }
 
+  async readCache() {
+    if (!this.cachePath) return undefined;
+    try {
+      const text = await fs.promises.readFile(this.cachePath, 'utf8');
+      return normalizeCachedQuota(JSON.parse(text));
+    } catch {
+      return undefined;
+    }
+  }
+
+  async writeCache(snapshot) {
+    if (!this.cachePath || !this.cacheTempPath || snapshot?.phase !== 'available' || snapshot?.cacheState !== 'fresh') return;
+    const serialized = `${JSON.stringify(quotaCachePayload(snapshot), null, 2)}\n`;
+    await fs.promises.mkdir(path.dirname(this.cachePath), { recursive: true });
+    await fs.promises.rm(this.cacheTempPath, { force: true });
+    await fs.promises.writeFile(this.cacheTempPath, serialized, { encoding: 'utf8', flag: 'wx' });
+    try {
+      await fs.promises.rename(this.cacheTempPath, this.cachePath);
+    } catch (error) {
+      if (!['EEXIST', 'EPERM', 'ENOTEMPTY'].includes(error.code)) throw error;
+      await fs.promises.rm(this.cachePath, { force: true });
+      await fs.promises.rename(this.cacheTempPath, this.cachePath);
+    }
+  }
+
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+    this.started = false;
     try { this.activeProcess?.kill?.(); } catch {}
     this.activeProcess = undefined;
     this.pending = false;
@@ -278,7 +350,10 @@ module.exports = {
   DEFAULT_TIMEOUT_MS,
   FIVE_HOUR_MINUTES,
   WEEK_MINUTES,
+  CACHE_SCHEMA_VERSION,
+  DEFAULT_CACHE_FILENAME,
   normalizeRateLimitsResponse,
+  normalizeCachedQuota,
   normalizeWindow,
   readAppServerQuota,
   unavailableQuota,

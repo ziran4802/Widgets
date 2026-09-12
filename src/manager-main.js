@@ -14,7 +14,7 @@ const { OperationQueue, secondInstanceAction } = require('./manager-lifecycle');
 const { TrayService } = require('./tray-service');
 const { AutostartService } = require('./autostart-service');
 const { createWidgetNativeImage } = require('./widget-icon');
-const { CodexQuotaService } = require('./codex-quota-service');
+const { CodexQuotaService, DEFAULT_CACHE_FILENAME } = require('./codex-quota-service');
 
 const reportFile = path.resolve(process.env.WIDGET_M1_REPORT || path.join(process.cwd(), 'diagnostics', 'm1-manager.jsonl'));
 let managerWindow;
@@ -249,7 +249,7 @@ function createWidgetRuntime() {
   if (process.env.WIDGET_M1_TEST_CODEX_QUOTA) {
     try { fixture = JSON.parse(process.env.WIDGET_M1_TEST_CODEX_QUOTA); } catch { report('codex-quota-test', { result: 'FAIL', reason: 'invalid test fixture' }); }
   }
-  codexQuota = new CodexQuotaService({ fixture });
+  codexQuota = new CodexQuotaService({ fixture, cachePath: path.join(app.getPath('userData'), DEFAULT_CACHE_FILENAME) });
   codexQuota.on('update', snapshot => widgetWindows.publishCodexQuota(snapshot));
 }
 
@@ -665,6 +665,7 @@ async function start() {
   service = new AppService({ store });
   const initial = await service.start();
   createWidgetRuntime();
+  await codexQuota.start();
   syncWidgetWindows(initial);
   router = new ManagerIpcRouter({
     service,
@@ -718,7 +719,6 @@ async function start() {
   createManagerWindow();
   scheduleTraySmokeTest();
   metrics.start();
-  codexQuota.start();
   scheduleRendererRecoveryTest();
   scheduleNoteSmokeTest();
   scheduleTodoSmokeTest();
