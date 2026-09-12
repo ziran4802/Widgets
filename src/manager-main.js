@@ -549,6 +549,7 @@ function scheduleCodexQuotaSmokeTest() {
           primary: root?.querySelector('.quota-ring-value')?.textContent,
           weekly: root?.querySelector('.quota-weekly-head strong')?.textContent,
           status: root?.querySelector('.quota-status')?.textContent,
+          feedback: root?.querySelector('.quota-feedback')?.textContent,
           button: root?.querySelector('.quota-read')?.textContent,
           resetValue: root?.querySelector('.quota-reset .quota-summary-value')
         };
@@ -566,16 +567,18 @@ function scheduleCodexQuotaSmokeTest() {
         && initial.primary === '55%'
         && initial.weekly === '剩余 70%'
         && initial.status === '上次结果'
+        && initial.feedback === '上次结果'
         && initial.button === '重新确认'
         && refreshed.primary === '62%'
         && refreshed.weekly === '剩余 78%'
         && refreshed.status === '已确认'
+        && refreshed.feedback === '已更新'
         && response?.ok === true
         && response.quota?.cacheState === 'fresh'
         && resetVisible
         && required.every(value => text.includes(value))
         && forbidden.every(value => !text.includes(value));
-      return { ok, initial: { primary: initial.primary, weekly: initial.weekly, status: initial.status, button: initial.button }, refreshed: { primary: refreshed.primary, weekly: refreshed.weekly, status: refreshed.status }, resetVisible, text, readyState: document.readyState, body: document.body?.innerHTML?.slice(0, 1200) };
+      return { ok, initial: { primary: initial.primary, weekly: initial.weekly, status: initial.status, feedback: initial.feedback, button: initial.button }, refreshed: { primary: refreshed.primary, weekly: refreshed.weekly, status: refreshed.status, feedback: refreshed.feedback }, resetVisible, text, readyState: document.readyState, body: document.body?.innerHTML?.slice(0, 1200) };
     })()`;
     record.window.webContents.executeJavaScript(script).then(result => {
       report('codex-quota-test', { result: result?.ok ? 'PASS' : 'FAIL', ...(result?.ok ? {} : { reason: JSON.stringify(result).slice(0, 1800) }) });

@@ -184,6 +184,14 @@ function quotaStatus(quota) {
   return '不可用';
 }
 
+function quotaFeedback(quota) {
+  if (quota?.phase === 'loading') return '正在读取…';
+  if (quota?.phase === 'stale') return '读取失败，保留上次结果';
+  if (quota?.phase === 'available') return quota.cacheState === 'cached' ? '上次结果' : '已更新';
+  if (quota?.phase === 'idle') return '待确认';
+  return '读取失败';
+}
+
 function renderQuotaSummary(label, value, className = '') {
   const item = node('div', undefined, `quota-summary-item ${className}`.trim());
   item.append(node('span', label, 'quota-summary-label'), node('strong', value, 'quota-summary-value'));
@@ -210,6 +218,10 @@ function renderCodexQuota(view) {
   badges.append(node('span', quotaStatus(current), `quota-status ${current.phase || 'unavailable'}`));
   header.append(badges);
   view.append(header);
+  const feedback = node('span', quotaFeedback(current), `quota-feedback ${current.phase || 'unavailable'}`);
+  feedback.setAttribute('role', 'status');
+  feedback.setAttribute('aria-live', 'polite');
+  view.append(feedback);
 
   const body = node('div', undefined, 'quota-body');
   const primary = node('section', undefined, 'quota-primary');

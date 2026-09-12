@@ -121,10 +121,18 @@ h1 { font-size: 20px; letter-spacing: -.03em; }
 .quota-status.loading, .quota-status.idle { border-color: rgba(74, 103, 139, .22); color: var(--muted); background: rgba(74, 103, 139, .08); }
 .quota-status.stale { border-color: rgba(205, 137, 31, .34); color: #a66c0a; background: rgba(205, 137, 31, .1); }
 .quota-status.unavailable { border-color: rgba(188, 73, 73, .28); color: #b14848; background: rgba(188, 73, 73, .08); }
+.quota-feedback { display: flex; align-items: center; gap: 7px; min-height: 24px; padding: 5px 9px; border: 1px solid rgba(38, 177, 91, .24); border-radius: 8px; color: #239250; background: rgba(38, 177, 91, .07); font-size: 11px; }
+.quota-feedback::before { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: currentColor; content: ''; }
+.quota-feedback.loading { border-color: rgba(23, 109, 206, .24); color: var(--accent); background: rgba(23, 109, 206, .07); }
+.quota-feedback.loading::before { width: 9px; height: 9px; flex-basis: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; background: transparent; animation: quota-spin .8s linear infinite; }
+.quota-feedback.idle { border-color: rgba(74, 103, 139, .22); color: var(--muted); background: rgba(74, 103, 139, .08); }
+.quota-feedback.stale { border-color: rgba(205, 137, 31, .34); color: #a66c0a; background: rgba(205, 137, 31, .1); }
+.quota-feedback.unavailable { border-color: rgba(188, 73, 73, .28); color: #b14848; background: rgba(188, 73, 73, .08); }
+@keyframes quota-spin { to { transform: rotate(360deg); } }
 .quota-body { display: grid; grid-template-columns: minmax(164px, .7fr) minmax(0, 1.3fr); align-items: stretch; gap: 14px; min-height: 0; }
 .quota-primary, .quota-weekly, .quota-summary { border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.055); }
 .widget.light .quota-primary, .widget.light .quota-weekly, .widget.light .quota-summary { background: rgba(18,35,58,.035); }
-.quota-primary { display: grid; min-height: 174px; place-items: center; }
+.quota-primary { display: grid; min-height: 150px; place-items: center; }
 .quota-ring { position: relative; display: grid; width: 148px; height: 148px; place-items: center; border-radius: 50%; background: conic-gradient(#176dce var(--quota-progress), rgba(136, 164, 198, .2) 0); }
 .quota-ring::before { position: absolute; inset: 10px; border-radius: 50%; background: var(--bg); content: ''; }
 .widget.light .quota-ring { background: conic-gradient(#176dce var(--quota-progress), rgba(74, 103, 139, .2) 0); }
