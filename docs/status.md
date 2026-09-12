@@ -6,6 +6,7 @@
 
 - Electron manager、主屏 WorkerW 组件窗口、托盘生命周期和统一退出清理。
 - 系统监测（CPU/内存/GPU 与物理网络速率）、时钟/日期、纯文本便签、每日待办和可选 Codex 额度组件。
+- Codex 额度启动时优先显示上次成功确认的本地快照；只有点击“确认额度/重新确认”才刷新，失败时保留旧结果并标记状态。快照不写入 Widget 配置，也不含凭据。
 - 每日待办当前支持本地当天任务的新增、勾选、进度显示和持久化；桌面默认可直接交互，标题条可锁定/恢复交互，锁定后可从托盘解锁；跨日自动清空，不保存历史或提醒。
 - 组件目录分页、单实例、紧凑实例列表分页、布局编辑、保存/取消、主题/透明度/锁定设置、配置持久化和 Renderer 恢复。
 - Windows 当前用户自启动代码仅对正式 portable `Widget.exe` 开放；开发版、M0 探针和非 portable 路径不会改真实启动项。
@@ -31,6 +32,8 @@
 - `npm.cmd run package:portable`：通过；`Widget.exe`、Electron 声明、项目 `LICENSE` 和 koffi `LICENSE.txt` 均在成品中。
 - M0 launcher 构建通过；带临时 profile、`--disable-gpu` 的 `--auto-attach` 探针退出码为 0。
 - `npm.cmd run smoke:desktop`：未通过，当前自动化会话报告 `WorkerW not found`；manager 能正常启动/退出，但无法在此会话完成真实 WorkerW 桌面层验证。
+- Codex 额度缓存与手动确认改造：`npm.cmd test` 为 121/121；`npm.cmd run smoke:codex-quota` 通过，使用临时 userData 预置上次结果，验证启动先显示缓存、点击按钮后更新为 fixture 最新值，刷新状态和敏感文案检查均通过。该 smoke 显式使用临时 floating 宿主以隔离额度 UI，不代表 WorkerW 的新增验证。
+- 本轮完成后重新执行 `npm.cmd run package:portable` 和 `npm.cmd run smoke:portable`，均通过；portable 成品只作本地验证，不提交到 Git。
 
 ### 2026-09-10 每日待办 WorkerW 输入修复尝试
 

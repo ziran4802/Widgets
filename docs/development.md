@@ -19,7 +19,7 @@
 | `src/widget-renderer.js` | 系统监测/时钟/便签/每日待办/额度渲染、主题和编辑态交互 |
 | `src/metrics-service.js` | CPU/内存采样，以及 GPU/网络异步 provider 结果合并 |
 | `src/resource-metrics.js` | Windows GPU Engine 和 Network Interface 读取及不可用降级 |
-| `src/codex-quota-service.js` | 本地 Codex app-server JSON-RPC quota provider 及窗口归一化 |
+| `src/codex-quota-service.js` | 本地 Codex app-server JSON-RPC quota provider、窗口归一化和本地快照缓存 |
 | `src/host-service.js` / `src/workerw-host-adapter.js` | 主屏 WorkerW 桌面宿主抽象、附着、输入和几何校验 |
 
 ## 运行命令
@@ -45,6 +45,7 @@ npm.cmd run probe
 - `WIDGET_M1_TEST_TODO_MS` / `WIDGET_M1_TEST_TODO_TITLE`：仅供每日待办 smoke 的临时 DOM 交互和保存检查。
 - `WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR`：仅供 manager UI smoke 将实际 Electron 页面抓取到指定临时目录；不应指向仓库提交路径。
 - `WIDGET_CODEX_EXECUTABLE`：可选地指定本地 Codex native executable；未指定时服务使用系统命令或已知的本机安装路径。
+- Codex 额度快照默认写入 Electron `app.getPath('userData')\codex-quota-cache.json`，只包含归一化额度窗口和最后成功确认时间；它不属于 `widget-config.json`，也不包含账号、Token、原始响应或费用信息。
 - `WIDGET_M1_HOST_MODE=floating`：仅用于诊断时显式使用普通 floating 窗口；正式默认尝试 desktop WorkerW，宿主失败时组件安全隐藏，不覆盖其他程序。
 
 配置身份保持为 Widget：代码使用 `widget-config.json`，自启动识别正式 `Widget.exe`，不要全局替换为仓库名 `Widgets`。
@@ -71,6 +72,8 @@ npm.cmd run smoke:portable
 smoke 脚本应使用临时配置、临时 Electron profile 和临时工作目录，并在结束时清理自己创建的范围。manager UI smoke 还会覆盖目录首末页、窗口缩放后的页容量、编辑面板替换和滚动高度检查；需要图片证据时使用 `WIDGET_M1_TEST_MANAGER_SCREENSHOT_DIR` 将抓图放在仓库外。自动化自启动 smoke 只验证 `--autostart --silent-autostart` 行为，不注册真实当前用户启动项。
 
 每日待办配置保存在组件私有配置中：`dateKey` 是本地日期，`items` 最多 64 条，每条只包含稳定 `id`、纯文本 `title` 和 `completed`。Widget 启动时检测日期变化并清空上一日任务；运行中跨午夜的刷新由组件窗口定时检查完成。新增和勾选通过 `widget-preload.js` 暴露的受控 IPC 保存，不直接访问文件系统。桌面交互默认开启；标题条锁定按钮和托盘菜单只切换窗口运行时输入模式，不新增或修改配置字段，锁定后可由托盘恢复。
+
+Codex 额度启动时只加载 userData 下的本地快照，不自动启动 app-server，也不设置网络刷新定时器。组件按钮通过 `widget:codex-quota-refresh` 发起一次受控刷新；刷新中保留旧窗口数据，失败时继续显示旧数据并标记本次确认失败，成功后原子更新快照。测试 fixture 也必须显式调用刷新入口，避免测试掩盖自动请求。
 
 portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生成的 `Widget.exe` 以及 `resources/app/LICENSE` 属于成品，不提交到 Git。Electron runtime 自带的 `LICENSE` / `LICENSES.chromium.html` 与 koffi 包内的许可证（当前包为 `LICENSE.txt`）保持独立，不以项目 MIT 文件覆盖它们。
 
