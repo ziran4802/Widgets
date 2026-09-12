@@ -541,22 +541,44 @@ function scheduleCodexQuotaSmokeTest() {
       report('codex-quota-test', { result: 'FAIL', reason: 'quota test target unavailable' });
       return;
     }
-    const script = `(() => {
-      const root = document.querySelector('.codex-quota');
+    const script = `(async () => {
+      const readView = () => {
+        const root = document.querySelector('.codex-quota');
+        return {
+          root,
+          primary: root?.querySelector('.quota-ring-value')?.textContent,
+          weekly: root?.querySelector('.quota-weekly-head strong')?.textContent,
+          status: root?.querySelector('.quota-status')?.textContent,
+          button: root?.querySelector('.quota-read')?.textContent,
+          resetValue: root?.querySelector('.quota-reset .quota-summary-value')
+        };
+      };
+      const initial = readView();
+      const response = await window.widget.refreshCodexQuota?.();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const refreshed = readView();
       const text = (document.body?.innerText || '').replace(/\\s+/g, ' ');
-      const required = ['Codex 额度', '本地读取', '已同步', '周额度', '5 小时重置', '周重置', '最后更新'];
+      const required = ['Codex 额度', '重新确认', '已确认', '周额度', '5 小时重置', '周重置', '最后更新'];
       const forbidden = ['费用', '成本', '$', '¥'];
-      const primary = root?.querySelector('.quota-ring-value')?.textContent === '62%';
-      const weekly = root?.querySelector('.quota-weekly-head strong')?.textContent === '剩余 78%';
-      const resetValue = root?.querySelector('.quota-reset .quota-summary-value');
-      const resetStyle = resetValue ? getComputedStyle(resetValue) : null;
+      const resetStyle = refreshed.resetValue ? getComputedStyle(refreshed.resetValue) : null;
       const resetVisible = resetStyle?.textOverflow === 'clip' && resetStyle.fontSize === '16px';
-      const weeklyReset = root?.querySelector('.quota-weekly-reset .quota-summary-value')?.textContent === '2100/01/01';
-      const ok = Boolean(root) && primary && weekly && resetVisible && weeklyReset && required.every(value => text.includes(value)) && forbidden.every(value => !text.includes(value));
-      return { ok, primary, weekly, resetVisible, weeklyReset, text };
+      const ok = Boolean(initial.root && refreshed.root)
+        && initial.primary === '55%'
+        && initial.weekly === '剩余 70%'
+        && initial.status === '上次结果'
+        && initial.button === '重新确认'
+        && refreshed.primary === '62%'
+        && refreshed.weekly === '剩余 78%'
+        && refreshed.status === '已确认'
+        && response?.ok === true
+        && response.quota?.cacheState === 'fresh'
+        && resetVisible
+        && required.every(value => text.includes(value))
+        && forbidden.every(value => !text.includes(value));
+      return { ok, initial: { primary: initial.primary, weekly: initial.weekly, status: initial.status, button: initial.button }, refreshed: { primary: refreshed.primary, weekly: refreshed.weekly, status: refreshed.status }, resetVisible, text, readyState: document.readyState, body: document.body?.innerHTML?.slice(0, 1200) };
     })()`;
     record.window.webContents.executeJavaScript(script).then(result => {
-      report('codex-quota-test', { result: result?.ok ? 'PASS' : 'FAIL', ...(result?.ok ? {} : { reason: `primary=${result?.primary}; weekly=${result?.weekly}; required text missing or forbidden text present` }) });
+      report('codex-quota-test', { result: result?.ok ? 'PASS' : 'FAIL', ...(result?.ok ? {} : { reason: JSON.stringify(result).slice(0, 1800) }) });
     }).catch(error => report('codex-quota-test', { result: 'FAIL', reason: sanitizeReason(error.message) }));
   }, delayMs);
 }

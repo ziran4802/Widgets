@@ -16,10 +16,11 @@ $userDataPath = Join-Path $smokeRoot 'user-data'
 $process = $null
 $success = $false
 $old = @{}
-foreach ($name in @('WIDGET_M1_CONFIG_PATH','WIDGET_M1_REPORT','WIDGET_M1_AUTO_EXIT_MS','WIDGET_M1_TEST_CODEX_QUOTA','WIDGET_M1_TEST_CODEX_QUOTA_MS')) { $old[$name] = [Environment]::GetEnvironmentVariable($name) }
+foreach ($name in @('WIDGET_M1_CONFIG_PATH','WIDGET_M1_REPORT','WIDGET_M1_AUTO_EXIT_MS','WIDGET_M1_TEST_CODEX_QUOTA','WIDGET_M1_TEST_CODEX_QUOTA_MS','WIDGET_M1_HOST_MODE')) { $old[$name] = [Environment]::GetEnvironmentVariable($name) }
 
 try {
   New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
+  New-Item -ItemType Directory -Path $userDataPath -Force | Out-Null
   $component = [ordered]@{
     instanceId = 'codex-quota-1'
     type = 'codex-quota'
@@ -44,11 +45,20 @@ try {
     primary = [ordered]@{ usedPercent = 38; windowDurationMins = 300; resetsAt = 4102444800 }
     secondary = [ordered]@{ usedPercent = 22; windowDurationMins = 10080; resetsAt = 4102444800 }
   }
+  $cached = [ordered]@{
+    schemaVersion = 1
+    updatedAt = '2026-09-07T00:00:00.000Z'
+    fiveHour = [ordered]@{ usedPercent = 45; windowDurationMins = 300; resetsAt = 4102444800 }
+    weekly = [ordered]@{ usedPercent = 30; windowDurationMins = 10080; resetsAt = 4102444800 }
+  }
+  $cachePath = Join-Path $userDataPath 'codex-quota-cache.json'
+  [System.IO.File]::WriteAllText($cachePath, ($cached | ConvertTo-Json -Depth 10), [System.Text.UTF8Encoding]::new($false))
   $env:WIDGET_M1_CONFIG_PATH = $configPath
   $env:WIDGET_M1_REPORT = $reportPath
   $env:WIDGET_M1_AUTO_EXIT_MS = '4800'
   $env:WIDGET_M1_TEST_CODEX_QUOTA = $fixture | ConvertTo-Json -Compress -Depth 10
   $env:WIDGET_M1_TEST_CODEX_QUOTA_MS = '1800'
+  $env:WIDGET_M1_HOST_MODE = 'floating'
   $process = Start-Process -FilePath $electronExecutable -ArgumentList @("--user-data-dir=$userDataPath", '--disable-gpu', '--no-sandbox', $projectRoot, '--manager') -WorkingDirectory $smokeRoot -WindowStyle Hidden -PassThru
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
   $entries = @()
