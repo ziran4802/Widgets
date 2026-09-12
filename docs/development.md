@@ -15,7 +15,7 @@
 | `src/config-store.js` | 原子写入、备份和恢复 |
 | `src/manager-ipc.js` | manager IPC 命令、来源校验和错误映射 |
 | `src/widget-window-service.js` | 组件 BrowserWindow 生命周期、桌面层切换、拖动、位置保存和恢复 |
-| `src/desktop-input-router.js` | WorkerW 待办区域的鼠标转发；普通应用遮挡、锁定、隐藏和布局编辑时不转发新点击 |
+| `src/desktop-input-router.js` | WorkerW 桌面可交互组件（每日待办、Codex 额度）的鼠标转发；普通应用遮挡、锁定、隐藏和布局编辑时不转发新点击 |
 | `src/widget-renderer.js` | 系统监测/时钟/便签/每日待办/额度渲染、主题和编辑态交互 |
 | `src/metrics-service.js` | CPU/内存采样，以及 GPU/网络异步 provider 结果合并 |
 | `src/resource-metrics.js` | Windows GPU Engine 和 Network Interface 读取及不可用降级 |
@@ -83,7 +83,7 @@ portable 打包复制 Electron runtime、`src/`、`package.json` 和 koffi；生
 
 需要自动处理遮挡时可运行 `npm.cmd run smoke:todo-desktop -- --minimize-obstruction`，允许脚本短暂最小化遮挡测试点的普通应用窗口，结束后恢复其原窗口状态。此测试需要可见桌面会话，不能把无桌面的沙箱执行结果当作实机输入证据。
 
-Windows 11 的壁纸 WorkerW 可能处于禁用状态。交互期间原生适配器暂时启用父窗口，并在最后一个交互组件锁定或脱离时恢复原状态。鼠标钩子仅转发每日待办区域中被同一桌面宿主接走的输入，不拦截键盘输入；键盘通过原生窗口焦点进入组件。Koffi 固定为 2.15.2，以包含 Node 24.14+ 回调退出崩溃的修复。
+Windows 11 的壁纸 WorkerW 可能处于禁用状态。交互期间原生适配器暂时启用父窗口，并在最后一个交互组件锁定或脱离时恢复原状态。鼠标钩子仅转发每日待办或 Codex 额度区域中被同一桌面宿主接走的输入，不拦截键盘输入；键盘通过原生窗口焦点进入组件。Koffi 固定为 2.15.2，以包含 Node 24.14+ 回调退出崩溃的修复。
 
 ## 人工验证边界
 
