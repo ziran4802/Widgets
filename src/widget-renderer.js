@@ -265,11 +265,9 @@ function stopClockTimer() {
 function renderClock(view) {
   stopClockTimer();
   const clock = node('section', undefined, 'clock');
-  clock.append(renderHeader(component.displayName, '本机时间'));
   const time = node('div', undefined, 'time');
   const date = node('div', undefined, 'date');
-  clock.append(time);
-  clock.append(date);
+  clock.append(time, date);
   view.append(clock);
   const update = () => {
     const now = new Date();

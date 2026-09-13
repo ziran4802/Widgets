@@ -70,9 +70,9 @@ h2 { margin-bottom: 0; font-size: 19px; letter-spacing: -.02em; }
 .catalog-card, .instance-card, .settings-card, .panel { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 7px 20px rgba(51, 88, 128, .045); }
 .catalog-card { display: grid; gap: 9px; min-width: 0; padding: 10px; }
 .preview { display: grid; min-height: 62px; place-items: center; border: 1px solid #cfe0f4; border-radius: 9px; background: linear-gradient(145deg, #edf5ff, #fafcff); overflow: hidden; }
-.preview-clock { width: 74%; padding: 13px 8px; border: 1px solid #a8c9ef; border-radius: 8px; background: #f4f9ff; color: #183455; text-align: center; box-shadow: 0 5px 14px rgba(54, 111, 181, .12); }
-.preview-clock strong { display: block; font-size: 22px; letter-spacing: -.04em; }
-.preview-clock small { color: #6e86a1; font-size: 9px; }
+.preview-clock { width: 78%; padding: 13px 8px; border: 1px solid #a8c9ef; border-radius: 8px; background: #f4f9ff; color: #183455; text-align: center; box-shadow: 0 5px 14px rgba(54, 111, 181, .12); }
+.preview-clock strong { display: block; font-size: 18px; letter-spacing: -.06em; white-space: nowrap; }
+.preview-clock small { color: #6e86a1; font-size: 9px; white-space: nowrap; }
 .preview-note { width: 66%; min-height: 74px; padding: 10px; border: 1px solid #e3cd75; border-radius: 7px; background: #fff4b8; color: #6c5d2c; font-size: 10px; }
 .preview-note strong { display: block; margin-bottom: 8px; font-size: 12px; }
 .preview-todo { width: 88%; padding: 10px; border: 1px solid #b8cbea; border-radius: 8px; background: #f7faff; color: #183455; font-size: 9px; }

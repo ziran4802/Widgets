@@ -114,7 +114,7 @@ function catalogPreview(type) {
     preview.append(rings);
   } else if (type === 'clock-date') {
     const clock = node('div', undefined, 'preview-clock');
-    clock.append(node('strong', '09:41'), node('small', '2026年9月7日  星期一'));
+    clock.append(node('strong', '09:41:08'), node('small', '2026年9月7日  星期一'));
     preview.append(clock);
   } else if (type === 'note') {
     const note = node('div', undefined, 'preview-note');
