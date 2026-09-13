@@ -76,7 +76,7 @@ function New-TestConfig([int]$ComponentCount, [string]$Path) {
       visible = $true
       locked = $true
       displayId = $null
-      bounds = [ordered]@{ x = 16; y = 192; width = 280; height = 128; unit = 'dip' }
+      bounds = [ordered]@{ x = 16; y = 192; width = 240; height = 112; unit = 'dip' }
       theme = [ordered]@{ name = 'system'; opacity = 0.92 }
       config = [ordered]@{ format = '24h'; showSeconds = $true }
     }

@@ -1,5 +1,5 @@
 const { CatalogState, CatalogStateError } = require('./catalog-state');
-const { migrateDailyTodo, migrateLegacyCodexQuotaBounds } = require('./config-contract');
+const { migrateDailyTodo, migrateLegacyClockBounds, migrateLegacyCodexQuotaBounds } = require('./config-contract');
 
 class AppServiceError extends Error {
   constructor(code, message, cause) {
@@ -27,20 +27,25 @@ class AppService {
   async start() {
     if (this.catalog) return this.snapshot();
     const loaded = await this.store.load();
-    const quotaMigration = migrateLegacyCodexQuotaBounds(loaded.config);
+    const clockMigration = migrateLegacyClockBounds(loaded.config);
+    const quotaMigration = migrateLegacyCodexQuotaBounds(clockMigration.config);
     const todoMigration = migrateDailyTodo(quotaMigration.config, this.now());
     let config = todoMigration.config;
     let migrationError;
-    if ((quotaMigration.changed || todoMigration.changed) && loaded.source === 'primary') {
+    const migrations = [clockMigration, quotaMigration, todoMigration];
+    if (migrations.some(migration => migration.changed) && loaded.source === 'primary') {
       try {
         const saved = await this.store.save(config, this.now());
         config = saved.config;
       } catch (error) {
-        const message = quotaMigration.changed && todoMigration.changed
+        const changedMigrations = migrations.filter(migration => migration.changed);
+        const message = changedMigrations.length > 1
           ? '组件配置已在本次运行升级，但未能写回配置'
           : todoMigration.changed
             ? '每日待办已切换到今天，但未能写回配置'
-            : '额度组件尺寸已在本次运行升级，但未能写回配置';
+            : clockMigration.changed
+              ? '时钟组件尺寸已在本次运行升级，但未能写回配置'
+              : '额度组件尺寸已在本次运行升级，但未能写回配置';
         migrationError = publicError(error.code || 'CONFIG_WRITE_FAILED', message);
       }
     }

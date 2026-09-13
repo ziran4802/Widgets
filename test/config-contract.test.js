@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createDefaultConfig, createDefaultComponent, createDefaultTodoConfig, migrateDailyTodo, migrateLegacyCodexQuotaBounds, normalizeConfig, normalizeComponent } = require('../src/config-contract');
+const { createDefaultConfig, createDefaultComponent, createDefaultTodoConfig, migrateDailyTodo, migrateLegacyClockBounds, migrateLegacyCodexQuotaBounds, normalizeConfig, normalizeComponent } = require('../src/config-contract');
 
 test('creates an empty versioned config and default component', () => {
   const now = new Date('2026-09-06T00:00:00.000Z');
@@ -12,6 +12,8 @@ test('creates an empty versioned config and default component', () => {
     components: []
   });
   assert.equal(createDefaultComponent('system-monitor', 'system-monitor-1').type, 'system-monitor');
+  const clock = createDefaultComponent('clock-date', 'clock-date-1');
+  assert.deepEqual(clock.bounds, { x: 16, y: 192, width: 240, height: 112, unit: 'dip' });
   const quota = createDefaultComponent('codex-quota', 'codex-quota-1');
   assert.deepEqual(quota.bounds, { x: 16, y: 336, width: 680, height: 300, unit: 'dip' });
 });
@@ -27,6 +29,21 @@ test('upgrades only the legacy default Codex quota size and keeps the position',
 
   const custom = { ...legacy, bounds: { x: 10, y: 20, width: 600, height: 280, unit: 'dip' } };
   const untouched = migrateLegacyCodexQuotaBounds({ ...config, components: [custom] });
+  assert.equal(untouched.changed, false);
+  assert.deepEqual(untouched.config.components[0].bounds, custom.bounds);
+});
+
+test('upgrades only the legacy default clock size and keeps the position', () => {
+  const legacy = createDefaultComponent('clock-date', 'clock-date-1');
+  legacy.bounds = { x: -120, y: 88, width: 280, height: 128, unit: 'dip' };
+  const config = { ...createDefaultConfig(), components: [legacy] };
+  const migrated = migrateLegacyClockBounds(config);
+  assert.equal(migrated.changed, true);
+  assert.deepEqual(migrated.config.components[0].bounds, { x: -120, y: 88, width: 240, height: 112, unit: 'dip' });
+  assert.deepEqual(config.components[0].bounds, { x: -120, y: 88, width: 280, height: 128, unit: 'dip' });
+
+  const custom = { ...legacy, bounds: { x: 10, y: 20, width: 300, height: 140, unit: 'dip' } };
+  const untouched = migrateLegacyClockBounds({ ...config, components: [custom] });
   assert.equal(untouched.changed, false);
   assert.deepEqual(untouched.config.components[0].bounds, custom.bounds);
 });

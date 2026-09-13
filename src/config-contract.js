@@ -19,7 +19,7 @@ const COMPONENT_DEFINITIONS = Object.freeze({
   }),
   'clock-date': Object.freeze({
     displayName: '时钟 / 日期',
-    bounds: Object.freeze({ x: 16, y: 192, width: 280, height: 128, unit: 'dip' }),
+    bounds: Object.freeze({ x: 16, y: 192, width: 240, height: 112, unit: 'dip' }),
     config: Object.freeze({ format: '24h', showSeconds: true })
   }),
   note: Object.freeze({
@@ -40,6 +40,7 @@ const COMPONENT_DEFINITIONS = Object.freeze({
 });
 
 const LEGACY_CODEX_QUOTA_BOUNDS = Object.freeze({ width: 520, height: 250 });
+const LEGACY_CLOCK_BOUNDS = Object.freeze({ width: 280, height: 128 });
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object') return false;
@@ -260,6 +261,25 @@ function migrateDailyTodo(config, now = new Date()) {
   return { config: changed ? next : config, changed };
 }
 
+function migrateLegacyClockBounds(config) {
+  if (!isPlainObject(config) || !Array.isArray(config.components)) return { config, changed: false };
+  let changed = false;
+  const next = clone(config);
+  next.components = next.components.map(component => {
+    if (component.type !== 'clock-date' || component.bounds.width !== LEGACY_CLOCK_BOUNDS.width || component.bounds.height !== LEGACY_CLOCK_BOUNDS.height) return component;
+    changed = true;
+    return {
+      ...component,
+      bounds: {
+        ...component.bounds,
+        width: COMPONENT_DEFINITIONS['clock-date'].bounds.width,
+        height: COMPONENT_DEFINITIONS['clock-date'].bounds.height
+      }
+    };
+  });
+  return { config: changed ? next : config, changed };
+}
+
 function migrateLegacyCodexQuotaBounds(config) {
   if (!isPlainObject(config) || !Array.isArray(config.components)) return { config, changed: false };
   let changed = false;
@@ -300,6 +320,7 @@ module.exports = {
   createDefaultComponent,
   createDefaultTodoConfig,
   migrateDailyTodo,
+  migrateLegacyClockBounds,
   migrateLegacyCodexQuotaBounds,
   normalizeNoteConfig,
   normalizeTodoConfig,

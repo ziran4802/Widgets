@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { AppService, AppServiceError } = require('../src/app-service');
 const { ConfigStore } = require('../src/config-store');
-const { createDefaultConfig } = require('../src/config-contract');
+const { createDefaultConfig, createDefaultComponent } = require('../src/config-contract');
 
 function serviceWithTempStore() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'widget-service-'));
@@ -50,6 +50,18 @@ test('persists the larger Codex quota default size during startup migration', as
   assert.deepEqual(snapshot.catalog.components[0].bounds, { x: -80, y: 120, width: 680, height: 300, unit: 'dip' });
   const persisted = await store.load();
   assert.deepEqual(persisted.config.components[0].bounds, { x: -80, y: 120, width: 680, height: 300, unit: 'dip' });
+});
+
+test('persists the smaller clock default size during startup migration', async () => {
+  const { store } = serviceWithTempStore();
+  const legacy = createDefaultComponent('clock-date', 'clock-date-1');
+  legacy.bounds = { x: -80, y: 120, width: 280, height: 128, unit: 'dip' };
+  await store.save({ ...createDefaultConfig(), components: [legacy] }, new Date('2026-09-06T00:00:00.000Z'));
+  const service = new AppService({ store, now: () => new Date('2026-09-06T00:01:00.000Z') });
+  const snapshot = await service.start();
+  assert.deepEqual(snapshot.catalog.components[0].bounds, { x: -80, y: 120, width: 240, height: 112, unit: 'dip' });
+  const persisted = await store.load();
+  assert.deepEqual(persisted.config.components[0].bounds, { x: -80, y: 120, width: 240, height: 112, unit: 'dip' });
 });
 
 test('edit is memory-only until complete and cancel preserves the saved state', async () => {
